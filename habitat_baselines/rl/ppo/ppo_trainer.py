@@ -52,6 +52,9 @@ from habitat_baselines.rl.ddppo.policy import (  # noqa: F401.
     PointNavResNetNet,
     PointNavResNetPolicy,
 )
+from habitat_baselines.rl.transformer_policy.transformer_policy import (  # noqa: F401.
+    TransformerResNetPolicy,
+)
 from habitat_baselines.rl.hrl.hierarchical_policy import (  # noqa: F401.
     HierarchicalPolicy,
 )
