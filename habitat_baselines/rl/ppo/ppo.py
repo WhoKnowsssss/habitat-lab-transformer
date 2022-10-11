@@ -193,7 +193,8 @@ class PPO(nn.Module):
                     batch["prev_actions"],
                     batch["masks"],
                     batch["actions"],
-                    batch["rnn_build_seq_info"],
+                    None,
+                    # batch["rnn_build_seq_info"],
                 )
 
                 ratio = torch.exp(action_log_probs - batch["action_log_probs"])

@@ -88,4 +88,5 @@ RL:
     # Model parameters
     backbone: resnet18
     rnn_type: LSTM
+    # MUST BE THE SAME AS CONTEXT LENGTH
     num_recurrent_layers: 2

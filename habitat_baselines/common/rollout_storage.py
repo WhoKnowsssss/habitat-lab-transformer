@@ -233,20 +233,20 @@ class RolloutStorage:
             batch = self.buffers[curr_slice]
             if advantages is not None:
                 batch["advantages"] = advantages[curr_slice]
-            batch["recurrent_hidden_states"] = batch[
-                "recurrent_hidden_states"
-            ][0:1]
+            # batch["recurrent_hidden_states"] = batch[
+            #     "recurrent_hidden_states"
+            # ][0:1]
 
             batch.map_in_place(lambda v: v.flatten(0, 1))
 
-            batch["rnn_build_seq_info"] = build_rnn_build_seq_info(
-                device=self.device,
-                build_fn_result=build_pack_info_from_dones(
-                    dones_cpu[
-                        0 : self.current_rollout_step_idx, inds.numpy()
-                    ].reshape(-1, len(inds)),
-                ),
-            )
+            # batch["rnn_build_seq_info"] = build_rnn_build_seq_info(
+            #     device=self.device,
+            #     build_fn_result=build_pack_info_from_dones(
+            #         dones_cpu[
+            #             0 : self.current_rollout_step_idx, inds.numpy()
+            #         ].reshape(-1, len(inds)),
+            #     ),
+            # )
 
             yield batch.to_tree()
 

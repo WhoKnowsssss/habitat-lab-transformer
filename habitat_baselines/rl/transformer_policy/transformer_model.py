@@ -303,7 +303,7 @@ class GPT(nn.Module):
         return optimizer
 
     # state, action, and return
-    def forward(self, states, actions, rtgs=None, timesteps=None):
+    def forward(self, states, actions, rtgs=None):
         # states: (batch, block_size, 4*84*84)
         # actions: (batch, block_size, 8)
         # targets: (batch, block_size, 8)
@@ -311,12 +311,12 @@ class GPT(nn.Module):
         # timesteps: (batch, 1, 1)
         # attention_mask: (batch, block_size)
 
-        assert (
-            states.shape[1] == actions.shape[1]
-            and actions.shape[1] == rtgs.shape[1]
-        ), "Dimension must match, {}, {}, {}".format(
-            states.shape[1], actions.shape[1], rtgs.shape[1]
-        )
+        # assert (
+        #     states.shape[1] == actions.shape[1]
+        #     and actions.shape[1] == rtgs.shape[1]
+        # ), "Dimension must match, {}, {}, {}".format(
+        #     states.shape[1], actions.shape[1], rtgs.shape[1]
+        # )
 
         state_inputs = list(
             torch.split(
@@ -436,53 +436,55 @@ class GPT(nn.Module):
         x = self.drop(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.ln_f(x)
+        return x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
 
-        if actions is not None and self.model_type == "reward_conditioned":
-            logits_loc = self.head(
-                x[:, (self.num_inputs - 2) :: self.num_inputs, :]
-            )  # only keep predictions from state_embeddings
-            logits_arm = self.head_2(
-                x[:, (self.num_inputs - 2) :: self.num_inputs, :]
-            )
-            logits_pick = self.head_3(
-                x[:, (self.num_inputs - 2) :: self.num_inputs, :]
-            )
-            logits_stop = self.head_4(
-                x[:, (self.num_inputs - 2) :: self.num_inputs, :]
-            )
-            value = self.head_value(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )
-        elif actions is None and self.model_type == "reward_conditioned":
-            logits = logits[:, 1:, :]
-        elif actions is not None and self.model_type == "bc":
-            logits_loc = self.head(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )  # only keep predictions from state_embeddings
-            logits_arm = self.head_2(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )
-            logits_pick = self.head_3(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )
-            logits_stop = self.head_4(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )
-            value = self.head_value(
-                x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
-            )
-        elif actions is None and self.model_type == "naive":
-            logits = logits  # for completeness
-        else:
-            raise NotImplementedError()
+        # if actions is not None and self.model_type == "reward_conditioned":
+        #     logits_loc = self.head(
+        #         x[:, (self.num_inputs - 2) :: self.num_inputs, :]
+        #     )  # only keep predictions from state_embeddings
+        #     logits_arm = self.head_2(
+        #         x[:, (self.num_inputs - 2) :: self.num_inputs, :]
+        #     )
+        #     logits_pick = self.head_3(
+        #         x[:, (self.num_inputs - 2) :: self.num_inputs, :]
+        #     )
+        #     logits_stop = self.head_4(
+        #         x[:, (self.num_inputs - 2) :: self.num_inputs, :]
+        #     )
+        #     value = self.head_value(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )
+        # elif actions is None and self.model_type == "reward_conditioned":
+        #     logits = logits[:, 1:, :]
+        # elif actions is not None and self.model_type == "bc":
+        #     logits_loc = self.head(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )  # only keep predictions from state_embeddings
+        #     logits_arm = self.head_2(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )
+        #     logits_pick = self.head_3(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )
+        #     logits_stop = self.head_4(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )
+        #     value = self.head_value(
+        #         x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
+        #     )
+        #     breakpoint()
+        # elif actions is None and self.model_type == "naive":
+        #     logits = logits  # for completeness
+        # else:
+        #     raise NotImplementedError()
 
-        # if we are given some desired targets also calculate the loss
-        loss = None
-        loss_dict = None
-        # a = (targets[:,:,9].long() + 1 + 2*torch.all(targets[:,:,8:-1].detach()==0,dim=-1))
-        # print(a[0])
-        # logits_loc = torch.argmax(logits_loc,dim=-1)
-        # print(logits_loc[0])
+        # # if we are given some desired targets also calculate the loss
+        # loss = None
+        # loss_dict = None
+        # # a = (targets[:,:,9].long() + 1 + 2*torch.all(targets[:,:,8:-1].detach()==0,dim=-1))
+        # # print(a[0])
+        # # logits_loc = torch.argmax(logits_loc,dim=-1)
+        # # print(logits_loc[0])
 
-        logits_loc = self.action_normalization.unnormalize(logits_loc)
-        return (logits_loc, logits_arm, logits_pick, logits_stop, value)
+        # logits_loc = self.action_normalization.unnormalize(logits_loc)
+        # return (logits_loc, logits_arm, logits_pick, logits_stop, value)

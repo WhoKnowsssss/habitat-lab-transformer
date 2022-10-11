@@ -304,7 +304,7 @@ class PPOTrainer(BaseRLTrainer):
             self.envs.num_envs,
             obs_space,
             self.policy_action_space,
-            ppo_cfg.hidden_size,
+            self.actor_critic.net.hidden_state_hxs_dim,
             num_recurrent_layers=self.actor_critic.net.num_recurrent_layers,
             is_double_buffered=ppo_cfg.use_double_buffered_sampler,
             action_shape=action_shape,

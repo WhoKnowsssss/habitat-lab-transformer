@@ -35,6 +35,7 @@ from habitat_baselines.rl.transformer_policy.action_distribution import (
     ActionDistribution,
 )
 from habitat_baselines.rl.ppo import NetPolicy
+from habitat_baselines.common.tensor_dict import TensorDict
 
 
 @baseline_registry.register_policy
@@ -145,7 +146,6 @@ class TransformerResnetNet(nn.Module):
             rnn_input_size += sum(
                 [observation_space.spaces[k].shape[0] for k in self._fuse_keys]
             )
-            rnn_input_size += 2
 
         self._hidden_size = hidden_size
 
@@ -210,6 +210,8 @@ class TransformerResnetNet(nn.Module):
                 ),
                 nn.ReLU(True),
             )
+        self._hxs_dim = (self._hidden_size // 2) + rnn_input_size + num_actions
+        self._num_actions = num_actions
         mconf = GPTConfig(
             num_actions,
             context_length,
@@ -228,8 +230,12 @@ class TransformerResnetNet(nn.Module):
         self.train()
 
     @property
+    def hidden_state_hxs_dim(self):
+        return self._hxs_dim
+
+    @property
     def num_recurrent_layers(self):
-        return 1
+        return self.context_length
 
     @property
     def output_size(self):
@@ -245,6 +251,7 @@ class TransformerResnetNet(nn.Module):
         rnn_hidden_states,
         prev_actions,
         masks,
+        rnn_build_seq_info=None,
         # targets=None,
         # rtgs=None,
         # timesteps=None,
@@ -274,47 +281,49 @@ class TransformerResnetNet(nn.Module):
                 # x.append(visual_feats)
 
         if self._fuse_keys is not None:
-            observations["obj_start_gps_compass"] = torch.stack(
-                [
-                    observations["obj_start_gps_compass"][:, 0],
-                    torch.cos(observations["obj_start_gps_compass"][:, 1]),
-                    torch.sin(observations["obj_start_gps_compass"][:, 1]),
-                ]
-            ).permute(1, 0)
-            observations["obj_goal_gps_compass"] = torch.stack(
-                [
-                    observations["obj_goal_gps_compass"][:, 0],
-                    torch.cos(observations["obj_goal_gps_compass"][:, 1]),
-                    torch.sin(observations["obj_goal_gps_compass"][:, 1]),
-                ]
-            ).permute(1, 0)
+            # observations["obj_start_gps_compass"] = torch.stack(
+            #     [
+            #         observations["obj_start_gps_compass"][:, 0],
+            #         torch.cos(observations["obj_start_gps_compass"][:, 1]),
+            #         torch.sin(observations["obj_start_gps_compass"][:, 1]),
+            #     ]
+            # ).permute(1, 0)
+            # observations["obj_goal_gps_compass"] = torch.stack(
+            #     [
+            #         observations["obj_goal_gps_compass"][:, 0],
+            #         torch.cos(observations["obj_goal_gps_compass"][:, 1]),
+            #         torch.sin(observations["obj_goal_gps_compass"][:, 1]),
+            #     ]
+            # ).permute(1, 0)
             fuse_states = torch.cat(
                 [observations[k] for k in self._fuse_keys], dim=-1
             )
             x.append(fuse_states)
 
-        outs = torch.cat(x, dim=1)
-        outs = outs.reshape(B, -1, *outs.shape[1:])
+        x = torch.cat(x, dim=1)
+        x = x.reshape(B, -1, *x.shape[1:])
 
-        assert outs.shape[1] <= self.context_length, "Input Dimension Error"
+        rnn_hidden_states *= masks.view(-1, 1, 1)
 
-        # Move valid state-action-reward pair to the left
+        current_context = torch.argmax(
+            (rnn_hidden_states.sum(-1) == 0).float(), -1
+        )
+        action_dim = self._num_actions
 
-        rtgs_ = torch.zeros_like(rtgs)
-        prev_actions_ = torch.zeros_like(prev_actions)
-        outs_ = torch.zeros_like(outs)
-        for i in range(current_context.shape[0]):
-            rtgs_[i, : current_context[i], :] = rtgs[
-                i, -current_context[i] :, :
-            ]
-            prev_actions_[i, : current_context[i], :] = prev_actions[
-                i, -current_context[i] :, :
-            ]
-            outs_[i, : current_context[i], :] = outs[
-                i, -current_context[i] :, :
-            ]
-        logits, loss, loss_dict = self.state_encoder(
-            outs_, prev_actions_, rtgs=rtgs_, timesteps=timesteps
+        # Write obs to context
+        rnn_hidden_states[
+            torch.arange(B), current_context, :-action_dim
+        ] = x.view(B, -1)
+
+        # Write actions to context
+        rnn_hidden_states[
+            torch.arange(B), current_context, -action_dim:
+        ] = prev_actions.view(B, -1)
+
+        out = self.state_encoder(
+            rnn_hidden_states[..., :-action_dim],
+            rnn_hidden_states[..., -action_dim:],
+            rtgs=None,
         )
 
-        return logits, loss, loss_dict
+        return out[torch.arange(B), current_context + 1], rnn_hidden_states, {}
