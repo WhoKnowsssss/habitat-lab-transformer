@@ -72,7 +72,12 @@ class CustomFixedCategorical(torch.distributions.Categorical):  # type: ignore
         return super().entropy().unsqueeze(-1)
 
 
-class CategoricalNet(nn.Module):
+class ActionDistributionNet(nn.Module):
+    def update(self, training_progress):
+        pass
+
+
+class CategoricalNet(ActionDistributionNet):
     def __init__(self, num_inputs: int, num_outputs: int) -> None:
         super().__init__()
 
@@ -99,7 +104,7 @@ class CustomNormal(torch.distributions.normal.Normal):
         return super().entropy().sum(-1, keepdim=True)
 
 
-class GaussianNet(nn.Module):
+class GaussianNet(ActionDistributionNet):
     def __init__(
         self,
         num_inputs: int,
@@ -110,28 +115,28 @@ class GaussianNet(nn.Module):
 
         self.action_activation = config.action_activation
         self.use_softplus = config.use_softplus
-        self.use_log_std = config.use_log_std
         use_std_param = config.use_std_param
         self.clamp_std = config.clamp_std
-
-        if self.use_log_std:
-            self.min_std = config.min_log_std
-            self.max_std = config.max_log_std
-            std_init = config.log_std_init
-        elif self.use_softplus:
-            inv_softplus = lambda x: math.log(math.exp(x) - 1)
-            self.min_std = inv_softplus(config.min_std)
-            self.max_std = inv_softplus(config.max_std)
-            std_init = inv_softplus(1.0)
-        else:
-            self.min_std = config.min_std
-            self.max_std = config.max_std
-            std_init = 1.0  # initialize std value so that std ~ 1
+        self.min_std = config.min_log_std
+        self.max_std = config.max_log_std
+        std_init = 0.0  # config.log_std_init
+        self.scheduled_std = False
 
         if use_std_param:
             self.std = torch.nn.parameter.Parameter(
                 torch.randn(num_outputs) * 0.01 + std_init
             )
+            num_linear_outputs = num_outputs
+        elif self.scheduled_std:
+            if self.use_log_std:
+                self.min_std = math.exp(self.min_std)
+                self.max_std = math.exp(self.max_std)
+                std_init = math.exp(std_init)
+                self.use_log_std = False
+
+            self.std_init = std_init
+            self.register_buffer("std", torch.full((), self.std_init))
+            self.update(0.0)
             num_linear_outputs = num_outputs
         else:
             self.std = None
@@ -143,6 +148,18 @@ class GaussianNet(nn.Module):
 
         if not use_std_param:
             nn.init.constant_(self.mu_maybe_std.bias[num_outputs:], std_init)
+
+    def update(self, training_progress: float):
+        if not self.scheduled_std:
+            return
+
+        init_var = math.pow(self.std_init, 2)
+        final_var = init_var * 0.1
+        new_var = (init_var - final_var) * (
+            1.0 - min(max(training_progress / (2 / 3), 0.0), 1.0)
+        ) + final_var
+
+        self.std.fill_(math.sqrt(new_var))
 
     def forward(self, x: Tensor) -> CustomNormal:
         mu_maybe_std = self.mu_maybe_std(x).float()
@@ -156,9 +173,8 @@ class GaussianNet(nn.Module):
             mu = torch.tanh(mu)
 
         if self.clamp_std:
-            std = torch.clamp(std, self.min_std, self.max_std)
-        if self.use_log_std:
-            std = torch.exp(std)
+            std = torch.clamp(std, min=self.min_std, max=self.max_std)
+        std = torch.exp(std)
         if self.use_softplus:
             std = torch.nn.functional.softplus(std)
 
@@ -760,3 +776,33 @@ class LagrangeInequalityCoefficient(nn.Module):
             return alpha.detach() * x - alpha * (x.detach() - self.threshold)
         else:
             return alpha * (self.threshold - x.detach()) - alpha.detach() * x
+
+
+def get_num_discrete_action_logits(action_space) -> int:
+    num_logits = 0
+    for v in iterate_action_space_recursively(action_space):
+        if isinstance(v, spaces.Discrete):
+            num_logits += v.n
+
+    return num_logits
+
+
+def get_num_continuous_action_logits(action_space) -> int:
+    num_logits = 0
+    for v in iterate_action_space_recursively(action_space):
+        if isinstance(v, spaces.Box):
+            num_logits += int(np.prod(v.shape))
+
+    return num_logits
+
+
+def get_num_action_logits(action_space) -> int:
+    return get_num_continuous_action_logits(
+        action_space
+    ) + get_num_discrete_action_logits(action_space)
+
+
+def get_num_distribution_parameters(action_space) -> int:
+    return 2 * get_num_continuous_action_logits(
+        action_space
+    ) + get_num_discrete_action_logits(action_space)

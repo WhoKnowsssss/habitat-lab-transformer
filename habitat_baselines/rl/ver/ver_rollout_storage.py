@@ -616,11 +616,11 @@ class VERRolloutStorage(RolloutStorage):
                 assert isinstance(
                     batch["recurrent_hidden_states"], torch.Tensor
                 )
-                batch["recurrent_hidden_states"] = batch[
-                    "recurrent_hidden_states"
-                ].index_select(
-                    0,
-                    rnn_build_seq_info["first_step_for_env"],
-                )
+                # batch["recurrent_hidden_states"] = batch[
+                #     "recurrent_hidden_states"
+                # ].index_select(
+                #     0,
+                #     rnn_build_seq_info["first_step_for_env"],
+                # )
 
                 yield batch.to_tree()

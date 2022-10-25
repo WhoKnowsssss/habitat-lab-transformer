@@ -18,6 +18,9 @@ def _recursive_apply(inp, fn):
         return type(inp)((k, _recursive_apply(v, fn)) for k, v in inp.items())
     elif isinstance(inp, (tuple, list)):
         return type(inp)(_recursive_apply(v, fn) for v in inp)
+    elif inp is None:
+        # To ignore the RNN sequence info.
+        return inp
     else:
         return fn(inp)
 

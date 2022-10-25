@@ -26,6 +26,7 @@ from habitat_baselines.utils.common import (
     GaussianNet,
     get_num_actions,
 )
+from habitat_baselines.rl.transformer_policy.action_distribution import MixedDistributionNet #Should be moved elsewhere
 
 
 class Policy(abc.ABC):
@@ -88,6 +89,12 @@ class NetPolicy(nn.Module, Policy):
                 self.net.output_size,
                 self.dim_actions,
                 policy_config.ACTION_DIST,
+            )
+        elif self.action_distribution_type == "mixed":
+            self.action_distribution = MixedDistributionNet(
+                self.net.output_size,
+                policy_config.ACTION_DIST,
+                action_space,
             )
         else:
             ValueError(
