@@ -149,8 +149,8 @@ class MixedDistributionNet(ActionDistributionNet):
             else spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
         }
 
-        if n_actions == 11:
-            ac_spaces["should_end"] = spaces.Discrete(1)
+        # if n_actions == 11:
+        #     ac_spaces["should_end"] = spaces.Discrete(1)
         self.action_space = spaces.Dict(ac_spaces)
 
         self.num_discrete_logits = get_num_discrete_action_logits(
