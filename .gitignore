@@ -90,8 +90,10 @@ data
 
 # habitat_baselines outputs
 /videos
+/video_dir
 /train_dir
 /tb
+/wandb
 
 # outputs from other libraries
 /sandbox
