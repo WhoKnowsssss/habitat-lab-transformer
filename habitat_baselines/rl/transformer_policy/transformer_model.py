@@ -162,10 +162,10 @@ class GPT(nn.Module):
         self.pos_emb = nn.Parameter(
             torch.zeros(1, config.block_size, config.n_embd)
         )
-        if config.num_skills != 0: 
-            self.skill_embedding = nn.Parameter(
-                torch.randn(config.num_skills, config.n_embd)
-            )
+        # if config.num_skills != 0: 
+        #     self.skill_embedding = nn.Parameter(
+        #         torch.randn(config.num_skills, config.n_embd)
+        #     )
         self.drop = nn.Dropout(config.embd_pdrop)
 
         # transformer
@@ -183,22 +183,23 @@ class GPT(nn.Module):
             sum(p.numel() for p in self.parameters()),
         )
 
-        if config.num_states[0] == 0:
-            self.state_encoder = nn.Sequential(
-                nn.Linear(config.num_states[1], config.n_embd), nn.Tanh()
-            )
-        else:
-            self.state_encoder = nn.ModuleList(
-                [
-                    nn.Sequential(nn.Linear(i, config.n_embd // 2), nn.Tanh())
-                    for i in [config.num_states[1]]
-                ]
-            )
+        # if config.num_states[0] == 0:
+        #     self.state_encoder = nn.Sequential(
+        #         nn.Linear(config.num_states[1], config.n_embd), nn.Tanh()
+        #     )
+        # else:
+        #     self.state_encoder = nn.ModuleList(
+        #         [
+        #             nn.Sequential(nn.Linear(i, config.n_embd // 2), nn.Tanh())
+        #             for i in [config.num_states[1]]
+        #         ]
+        #     )
 
         # self.ret_emb = nn.Sequential(nn.Linear(1, config.n_embd), nn.Tanh())
+        self.tok_emb = nn.Linear(256+21+32, config.n_embd)
 
         self.action_embeddings = nn.Sequential(
-            nn.Linear(config.vocab_size, config.n_embd), nn.Tanh()
+            nn.Linear(config.vocab_size, 32), nn.Tanh()
         )
         nn.init.normal_(self.action_embeddings[0].weight, mean=0.0, std=0.02)
 
@@ -211,7 +212,7 @@ class GPT(nn.Module):
 
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.data.normal_(mean=0.0, std=0.02)
+            module.weight.data.normal_(mean=0.0, std=0.02) #HACK
             if isinstance(module, nn.Linear) and module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, nn.LayerNorm):
@@ -318,10 +319,10 @@ class GPT(nn.Module):
         # vision_embeddings = self.vision_encoder(visual_input.reshape(-1, 1, 128, 128).type(torch.float32).contiguous())
         # vision_embeddings = vision_embeddings.reshape(states.shape[0], states.shape[1], self.config.n_embd//2) # (batch, block_size, n_embd)
 
-        for i in range(1, len(state_inputs)):
-            state_inputs[i] = self.state_encoder[i - 1](
-                state_inputs[i].type(torch.float32)
-            )
+        # for i in range(1, len(state_inputs)):
+        #     state_inputs[i] = self.state_encoder[i - 1](
+        #         state_inputs[i].type(torch.float32)
+        #     )
 
         if actions is not None and self.model_type == "reward_conditioned":
             rtg_embeddings = self.ret_emb(rtgs.type(torch.float32))
@@ -365,32 +366,27 @@ class GPT(nn.Module):
         elif actions is not None and self.model_type == "bc":
             # temp_a = actions[:, :, :7].contiguous()
             actions = torch.clone(actions)
-            actions[:, :, :7] = (
-                torch.bucketize(actions[:, :, :7], self.boundaries) - 1
-            ) / 10
-            actions[:,:,[10]] = 0
+            # actions[:, :, :7] = (
+            #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
+            # ) / 10
+            # actions[:,:,[10]] = 0
             actions = actions.type(torch.float32)
             action_embeddings = self.action_embeddings(
                 actions
             )  # (batch, block_size, n_embd)
             if skill_set is not None:
-                token_embeddings = torch.zeros(
-                    (
-                        states.shape[0],
-                        (self.num_inputs) * states.shape[1],
-                        self.config.n_embd,
-                    ),
-                    dtype=torch.float32,
-                    device=action_embeddings.device,
+                # token_embeddings = torch.zeros(
+                #     (
+                #         states.shape[0],
+                #         (self.num_inputs) * states.shape[1],
+                #         self.config.n_embd,
+                #     ),
+                #     dtype=torch.float32,
+                #     device=action_embeddings.device,
+                # )
+                token_embeddings = torch.cat(
+                    [state_inputs[0], state_inputs[-1], action_embeddings], dim=-1
                 )
-                token_embeddings[:,  :: (self.num_inputs), :] = self.skill_embedding[skill_set.long()].repeat(1,1,1,1).view(skill_set.shape[0],-1,self.config.n_embd)
-                token_embeddings[:, 1 :: (self.num_inputs), :] = torch.cat(
-                    [state_inputs[0], state_inputs[-1]], dim=-1
-                )
-
-                token_embeddings[
-                    :, (self.num_inputs - 1) :: (self.num_inputs), :
-                ] = action_embeddings
             else:
                 raise NotImplementedError
         else:
@@ -422,10 +418,12 @@ class GPT(nn.Module):
         # position_embeddings = torch.gather(all_global_pos_emb, 1, torch.repeat_interleave(timesteps, self.config.n_embd, dim=-1)) + self.pos_emb[:, :token_embeddings.shape[1], :]
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
 
+        token_embeddings = self.tok_emb(token_embeddings)
         x = self.drop(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.ln_f(x)
 
+        return x[:,:,:]
         if actions is not None and self.model_type == "reward_conditioned":
             return x[:, (self.num_inputs - 2) :: (self.num_inputs), :]
         elif actions is not None and self.model_type == "bc":

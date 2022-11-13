@@ -30,6 +30,10 @@ from habitat_baselines.rl.transformer_policy.transformer_model import (
     GPTConfig,
     GPT,
 )
+# from habitat_baselines.rl.models.rnn_state_encoder import (
+#     build_rnn_state_encoder,
+# )
+# from habitat_baselines.transformer.pure_bc_model import LSTMBC
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.utils.common import get_num_actions
 from habitat_baselines.rl.transformer_policy.action_distribution import (
@@ -162,7 +166,7 @@ class TransformerResNetPolicy(NetPolicy):
         rnn_hidden_states,
         prev_actions,
         masks,
-        deterministic=True,
+        deterministic=False,
     ):
         (value, action, action_log_probs, rnn_hidden_states,) = super().act(
             observations,
@@ -180,10 +184,10 @@ class TransformerResNetPolicy(NetPolicy):
                 + 3 * (action[:, 7] == 2).int()
                 - 2
             )
-        mask = action[:,7:8] == -1
-        action = torch.cat([action, torch.zeros_like(mask.float())], dim=-1)
+            mask = action[:,7:8] == -1
+            action = torch.cat([action, torch.zeros_like(mask.float())], dim=-1)
 
-        #============= advance hidden state ===============
+        # #============= advance hidden state ===============
         mask = ~torch.any(
                 (rnn_hidden_states.sum(-1) == 0), -1
         )
@@ -435,6 +439,13 @@ class TransformerResnetNet(nn.Module):
             use_rgb = use_rgb
         )  # 6,8
         self.state_encoder = GPT(mconf)
+        # self.state_encoder = LSTMBC(mconf)
+        # self.state_encoder = build_rnn_state_encoder(
+        #     256+21+12,
+        #     self._hidden_size,
+        #     rnn_type='lstm',
+        #     num_layers=2,
+        # )
 
         mconf = GPTConfig(
             num_actions,
@@ -579,10 +590,16 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -obs_dim
         ] = observations['is_holding'].reshape(B)
 
+        rnn_hidden_states = rnn_hidden_states.contiguous()
+        
         out = self.state_encoder(
             rnn_hidden_states[..., :-action_dim],
             rnn_hidden_states[..., -action_dim:],
             rtgs=None,
         )
+
+        # out, _ = self.state_encoder(
+        #     rnn_hidden_states, None, masks
+        # )
 
         return out[torch.arange(B), current_context], rnn_hidden_states, {}

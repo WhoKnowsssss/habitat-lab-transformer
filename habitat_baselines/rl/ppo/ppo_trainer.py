@@ -162,7 +162,8 @@ class PPOTrainer(BaseRLTrainer):
                 {  # type: ignore
                     k[len("actor_critic.") :]: v
                     for k, v in pretrained_state["state_dict"].items()
-                }
+                }, 
+                strict=False
             )
         elif self.config.RL.DDPPO.pretrained_encoder:
             prefix = "actor_critic.net.visual_encoder."
@@ -175,13 +176,25 @@ class PPOTrainer(BaseRLTrainer):
             )
 
         if not self.config.RL.DDPPO.train_encoder:
-            self._static_encoder = True
+            # self._static_encoder = True
             for param in self.actor_critic.net.visual_encoder.parameters():
                 param.requires_grad_(False)
+        
+        # for name, param in self.actor_critic.net.named_parameters():
+        #     param.requires_grad = False
+        # # # HACK
+        # for name, param in self.actor_critic.named_parameters():
+        #     if 'critic' in name:
+        #         param.requires_grad = True
+        #     else:
+        #         param.requires_grad = False
 
         if self.config.RL.DDPPO.reset_critic:
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
             nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
+        
+        # with torch.no_grad():
+        #     self.actor_critic.action_distribution.std[:] = -1
 
         self.agent = (DDPPO if self._is_distributed else PPO).from_config(
             self.actor_critic, ppo_cfg
@@ -272,7 +285,7 @@ class PPOTrainer(BaseRLTrainer):
         self._setup_actor_critic_agent(ppo_cfg)
         if resume_state is not None:
             self.agent.load_state_dict(resume_state["state_dict"])
-            self.agent.optimizer.load_state_dict(resume_state["optim_state"])
+            # self.agent.optimizer.load_state_dict(resume_state["optim_state"])
         if self._is_distributed:
             self.agent.init_distributed(find_unused_params=False)  # type: ignore
 
@@ -336,6 +349,7 @@ class PPOTrainer(BaseRLTrainer):
         self.env_time = 0.0
         self.pth_time = 0.0
         self.t_start = time.time()
+
 
     @rank0_only
     @profiling_wrapper.RangeContext("save_checkpoint")
@@ -435,6 +449,9 @@ class PPOTrainer(BaseRLTrainer):
                 env_slice,
             ]
 
+            # import torchvision
+            # from torchvision.utils import save_image
+            # save_image(step_batch["observations"]['robot_head_depth'].permute(0,3,1,2), 'video_dir/npnp_25k_train/{}.png'.format(int(time.time())))
             profiling_wrapper.range_push("compute actions")
             (
                 values,
@@ -447,6 +464,8 @@ class PPOTrainer(BaseRLTrainer):
                 step_batch["prev_actions"],
                 step_batch["masks"],
             )
+            # print(actions[:,8:10])
+            # time.sleep(0.1)
 
         self.pth_time += time.time() - t_sample_action
 
@@ -579,7 +598,7 @@ class PPOTrainer(BaseRLTrainer):
 
         self.agent.train()
 
-        losses = self.agent.update(self.rollouts)
+        losses = self.agent.update(self.rollouts, self.num_updates_done)
 
         self.rollouts.after_update()
         self.pth_time += time.time() - t_update_model
@@ -653,6 +672,11 @@ class PPOTrainer(BaseRLTrainer):
         for k, v in losses.items():
             writer.add_scalar(f"learner/{k}", v, self.num_steps_done)
 
+        # for k, v in metrics.items():
+        #     print(f"metrics/{k}: {v}, ", self.num_steps_done)
+        # for k, v in losses.items():
+        #     print(f"learner/{k}: {v}, ", self.num_steps_done)
+
         fps = self.num_steps_done / ((time.time() - self.t_start) + prev_time)
         writer.add_scalar("perf/fps", fps, self.num_steps_done)
 
@@ -712,9 +736,16 @@ class PPOTrainer(BaseRLTrainer):
         count_checkpoints = 0
         prev_time = 0
 
+        # lr_scheduler = LambdaLR(
+        #     optimizer=self.agent.optimizer,
+        #     lr_lambda=lambda x: 1 - self.percent_done(),
+        # )
+
+        warm_up_dpdates = 500
         lr_scheduler = LambdaLR(
             optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: 1 - self.percent_done(),
+            lr_lambda=lambda x: min(self.num_updates_done - warm_up_dpdates, 0) / warm_up_dpdates + 1
+            if self.num_updates_done < warm_up_dpdates else 0.8 - self.percent_done(),
         )
 
         if self._is_distributed:
@@ -722,7 +753,7 @@ class PPOTrainer(BaseRLTrainer):
 
         if resume_state is not None:
             self.agent.load_state_dict(resume_state["state_dict"])
-            self.agent.optimizer.load_state_dict(resume_state["optim_state"])
+            # self.agent.optimizer.load_state_dict(resume_state["optim_state"])
             lr_scheduler.load_state_dict(resume_state["lr_sched_state"])
 
             requeue_stats = resume_state["requeue_stats"]
@@ -925,7 +956,6 @@ class PPOTrainer(BaseRLTrainer):
             logger.info(f"env config: {config}")
 
         self._init_envs(config, is_eval=True)
-
         action_space = self.envs.action_spaces[0]
         self.policy_action_space = action_space
         self.orig_policy_action_space = self.envs.orig_action_spaces[0]
@@ -941,7 +971,7 @@ class PPOTrainer(BaseRLTrainer):
         self._setup_actor_critic_agent(ppo_cfg)
 
         if self.agent.actor_critic.should_load_agent_state:
-            self.agent.load_state_dict(ckpt_dict["state_dict"])
+            self.agent.load_state_dict(ckpt_dict["state_dict"], strict=False)
         self.actor_critic = self.agent.actor_critic
 
         observations = self.envs.reset()
@@ -954,8 +984,8 @@ class PPOTrainer(BaseRLTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
-            self.actor_critic.num_recurrent_layers,
-            ppo_cfg.hidden_size,
+            30,
+            self.actor_critic.net.hidden_state_hxs_dim,
             device=self.device,
         )
         prev_actions = torch.zeros(
@@ -1020,7 +1050,7 @@ class PPOTrainer(BaseRLTrainer):
                     test_recurrent_hidden_states,
                     prev_actions,
                     not_done_masks,
-                    deterministic=False,
+                    deterministic=True,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore
@@ -1131,6 +1161,15 @@ class PPOTrainer(BaseRLTrainer):
                             self.config.TASK_CONFIG.TASK,
                             current_episodes_info[i].episode_id,
                         )
+
+                    aggregated_stats = {}
+                    for stat_key in next(iter(stats_episodes.values())).keys():
+                        aggregated_stats[stat_key] = np.mean(
+                            [v[stat_key] for v in stats_episodes.values()]
+                        )
+                    for k in aggregated_stats.keys():
+                        if 'success' in k:
+                            print('\n\n', k, '\n\n', aggregated_stats[k])
 
             not_done_masks = not_done_masks.to(device=self.device)
             (

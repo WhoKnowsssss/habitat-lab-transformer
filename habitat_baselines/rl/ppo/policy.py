@@ -146,10 +146,17 @@ class NetPolicy(nn.Module, Policy):
                 action = distribution.mode()
             elif self.action_distribution_type == "gaussian":
                 action = distribution.mean
+            elif self.action_distribution_type == "mixed":
+                action = distribution.mean()
         else:
             action = distribution.sample()
 
         action_log_probs = distribution.log_probs(action)
+        # mask = ~torch.any(
+        # (rnn_hidden_states.sum(-1) == 0), -1
+        # )
+        # rnn_hidden_states[mask] = rnn_hidden_states[mask].roll(-1, 1)
+        # rnn_hidden_states[mask, -1, :] = 0
 
         return value, action, action_log_probs, rnn_hidden_states
 
@@ -228,6 +235,13 @@ class CriticHead(nn.Module):
     def __init__(self, input_size):
         super().__init__()
         self.fc = nn.Linear(input_size, 1)
+        # self.fc2 = nn.Sequential(
+        #     nn.Linear(input_size, 2*input_size),
+        #     nn.ReLU(),
+        #     nn.Linear(2*input_size, input_size),
+        #     nn.ReLU(),
+        #     nn.Linear(input_size, 1)
+        # )
         nn.init.orthogonal_(self.fc.weight)
         nn.init.constant_(self.fc.bias, 0)
 
