@@ -106,8 +106,10 @@ class PPO(nn.Module):
             #     lr=lr,
             #     eps=eps,
             # )
-            params = list(filter(lambda kv: 'net' not in kv[0] and kv[1].requires_grad, self.named_parameters()))
-            net_params = list(filter(lambda kv: 'net' in kv[0] and kv[1].requires_grad, self.named_parameters()))
+            # params = list(filter(lambda kv: ('net' not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
+            # net_params = list(filter(lambda kv: ('net' in kv[0]) and kv[1].requires_grad, self.named_parameters()))
+            params = list(filter(lambda kv: ('net' not in kv[0] or "visual_encoder" in kv[0]) and kv[1].requires_grad, self.named_parameters()))
+            net_params = list(filter(lambda kv: ('net' in kv[0] and "visual_encoder" not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
             params = [p[1] for p in params]
             net_params = [p[1] for p in net_params]
             if len(net_params) == 0:

@@ -93,6 +93,24 @@ class ActionDistribution:
             ],
             -1,
         )
+        # return torch.cat(
+        #     [
+        #         dist.sample().to(self.dtype)
+        #         if isinstance(dist, CustomFixedCategorical)
+        #         else dist.mean
+        #         for dist in self.distributions
+        #     ],
+        #     -1,
+        # )
+        # return torch.cat(
+        #     [
+        #         dist.sample().to(self.dtype)
+        #         if isinstance(dist, CustomNormal)
+        #         else dist.mode()
+        #         for dist in self.distributions
+        #     ],
+        #     -1,
+        # )
 
     def mean(self):
         return torch.cat(
@@ -112,9 +130,23 @@ class ActionDistribution:
         ):
             all_log_probs.append(dist.log_probs(action[..., _slice].to(dtype)))
 
+        # for dist, _slice, dtype in zip(
+        #     self.distributions, self.action_slices, self.action_dtypes
+        # ):
+        #     if isinstance(dist, CustomFixedCategorical):
+        #         all_log_probs.append(dist.log_probs(action[..., _slice].to(dtype)))
+
+        # for dist, _slice, dtype in zip(
+        #     self.distributions, self.action_slices, self.action_dtypes
+        # ):
+        #     if isinstance(dist, CustomNormal):
+        #         all_log_probs.append(dist.log_probs(action[..., _slice].to(dtype)))
+
         return sum_tensor_list(all_log_probs)
 
     def entropy(self):
+        # return sum_tensor_list([dist.entropy() for dist in self.distributions
+        #                         if isinstance(dist, CustomNormal)])
         return sum_tensor_list([dist.entropy() for dist in self.distributions])
 
 
@@ -130,10 +162,11 @@ class MixedDistributionNet(ActionDistributionNet):
         self.action_activation = config.action_activation
         self.use_softplus = config.use_softplus
         use_std_param = config.use_std_param
+        use_std_param = False
         self.clamp_std = config.clamp_std
         self.min_std = config.min_log_std
         self.max_std = config.max_log_std
-        std_init = 0.0  # config.log_std_init
+        std_init = config.log_std_init
         self.scheduled_std = False
 
         n_actions = get_num_actions(action_space)
@@ -210,7 +243,7 @@ class MixedDistributionNet(ActionDistributionNet):
             return logits
 
         if self.std is not None:
-            std = self.std
+            std = (self.std).repeat(x.shape[0], 1)
         else:
             std = self.std_head(x)
 

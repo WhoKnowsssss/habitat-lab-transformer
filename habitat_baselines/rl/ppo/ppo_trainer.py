@@ -741,11 +741,11 @@ class PPOTrainer(BaseRLTrainer):
         #     lr_lambda=lambda x: 1 - self.percent_done(),
         # )
 
-        warm_up_dpdates = 500
+        warmup_updates = self.config.RL.PPO.warmup_updates
         lr_scheduler = LambdaLR(
             optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: min(self.num_updates_done - warm_up_dpdates, 0) / warm_up_dpdates + 1
-            if self.num_updates_done < warm_up_dpdates else 0.8 - self.percent_done(),
+            lr_lambda=lambda x: min(self.num_updates_done - warmup_updates, 0) / warmup_updates + 1
+            if self.num_updates_done < warmup_updates else 1 - self.percent_done(),
         )
 
         if self._is_distributed:

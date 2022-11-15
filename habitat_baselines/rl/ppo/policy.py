@@ -152,11 +152,6 @@ class NetPolicy(nn.Module, Policy):
             action = distribution.sample()
 
         action_log_probs = distribution.log_probs(action)
-        # mask = ~torch.any(
-        # (rnn_hidden_states.sum(-1) == 0), -1
-        # )
-        # rnn_hidden_states[mask] = rnn_hidden_states[mask].roll(-1, 1)
-        # rnn_hidden_states[mask, -1, :] = 0
 
         return value, action, action_log_probs, rnn_hidden_states
 

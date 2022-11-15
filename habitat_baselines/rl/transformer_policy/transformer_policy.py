@@ -33,7 +33,7 @@ from habitat_baselines.rl.transformer_policy.transformer_model import (
 # from habitat_baselines.rl.models.rnn_state_encoder import (
 #     build_rnn_state_encoder,
 # )
-# from habitat_baselines.transformer.pure_bc_model import LSTMBC
+from habitat_baselines.transformer.pure_bc_model import LSTMBC
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.utils.common import get_num_actions
 from habitat_baselines.rl.transformer_policy.action_distribution import (
@@ -57,6 +57,7 @@ class TransformerResNetPolicy(NetPolicy):
         max_episode_step: int = 200,
         n_layer: int = 6,
         n_head: int = 8,
+        reg_flags = None, 
         model_type: str = "reward_conditioned",
         resnet_baseplanes: int = 32,
         backbone: str = "resnet18",
@@ -77,6 +78,7 @@ class TransformerResNetPolicy(NetPolicy):
                 model_type=model_type,
                 n_head=n_head,
                 n_layer=n_layer,
+                reg_flags=reg_flags,
                 backbone=backbone,
                 resnet_baseplanes=resnet_baseplanes,
                 force_blind_policy=force_blind_policy,
@@ -153,11 +155,13 @@ class TransformerResNetPolicy(NetPolicy):
             model_type=config.RL.TRANSFORMER.model_type,
             n_head=config.RL.TRANSFORMER.n_head,
             n_layer=config.RL.TRANSFORMER.n_layer,
+            reg_flags=config.RL.TRANSFORMER.reg_flags,
             backbone=config.RL.TRANSFORMER.backbone,
             force_blind_policy=config.FORCE_BLIND_POLICY,
             policy_config=config.RL.POLICY,
             fuse_keys=config.TASK_CONFIG.GYM.OBS_KEYS,
             # fuse_keys=config.RL.GYM_OBS_KEYS
+
         )
 
     def act(
@@ -314,6 +318,7 @@ class TransformerResnetNet(nn.Module):
         model_type: str,
         n_head: int,
         n_layer: int,
+        reg_flags,
         backbone,
         resnet_baseplanes,
         force_blind_policy: bool = False,
@@ -436,7 +441,8 @@ class TransformerResnetNet(nn.Module):
             model_type=model_type,
             max_timestep=max_episode_step,
             num_skills=num_skills,
-            use_rgb = use_rgb
+            use_rgb = use_rgb,
+            reg_flags=reg_flags,
         )  # 6,8
         self.state_encoder = GPT(mconf)
         # self.state_encoder = LSTMBC(mconf)
@@ -460,7 +466,7 @@ class TransformerResnetNet(nn.Module):
             model_type=model_type,
             max_timestep=max_episode_step,
             num_skills=num_skills, 
-            use_rgb=use_rgb
+            use_rgb=use_rgb,
         )  # 6,8
         # self.planner_encoder = GPT(mconf)
 
