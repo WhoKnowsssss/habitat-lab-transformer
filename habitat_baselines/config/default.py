@@ -198,6 +198,7 @@ _C.RL.PPO.num_steps = 5
 _C.RL.PPO.use_gae = True
 _C.RL.PPO.use_linear_lr_decay = False
 _C.RL.PPO.use_linear_clip_decay = False
+_C.RL.PPO.use_warmup_linear_lr_decay = False
 _C.RL.PPO.gamma = 0.99
 _C.RL.PPO.tau = 0.95
 _C.RL.PPO.reward_window_size = 50

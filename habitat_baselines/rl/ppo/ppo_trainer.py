@@ -163,7 +163,7 @@ class PPOTrainer(BaseRLTrainer):
                     k[len("actor_critic.") :]: v
                     for k, v in pretrained_state["state_dict"].items()
                 }, 
-                strict=False
+                # strict=False
             )
         elif self.config.RL.DDPPO.pretrained_encoder:
             prefix = "actor_critic.net.visual_encoder."
@@ -736,17 +736,20 @@ class PPOTrainer(BaseRLTrainer):
         count_checkpoints = 0
         prev_time = 0
 
-        # lr_scheduler = LambdaLR(
-        #     optimizer=self.agent.optimizer,
-        #     lr_lambda=lambda x: 1 - self.percent_done(),
-        # )
+        if self.config.RL.PPO.use_warmup_linear_lr_decay:
+            warmup_updates = self.config.RL.PPO.warmup_updates
+            lr_scheduler = LambdaLR(
+                optimizer=self.agent.optimizer,
+                lr_lambda=lambda x: min(self.num_updates_done - warmup_updates, 0) / warmup_updates + 1
+                if self.num_updates_done < warmup_updates else 1 - self.percent_done(),
+            )
+        else:
+            lr_scheduler = LambdaLR(
+                optimizer=self.agent.optimizer,
+                lr_lambda=lambda x: 1 - self.percent_done(),
+            )
 
-        warmup_updates = self.config.RL.PPO.warmup_updates
-        lr_scheduler = LambdaLR(
-            optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: min(self.num_updates_done - warmup_updates, 0) / warmup_updates + 1
-            if self.num_updates_done < warmup_updates else 1 - self.percent_done(),
-        )
+        
 
         if self._is_distributed:
             torch.distributed.barrier()
@@ -971,7 +974,9 @@ class PPOTrainer(BaseRLTrainer):
         self._setup_actor_critic_agent(ppo_cfg)
 
         if self.agent.actor_critic.should_load_agent_state:
-            self.agent.load_state_dict(ckpt_dict["state_dict"], strict=False)
+            self.agent.load_state_dict(ckpt_dict["state_dict"], 
+            # strict=False
+            )
         self.actor_critic = self.agent.actor_critic
 
         observations = self.envs.reset()
