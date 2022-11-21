@@ -61,6 +61,7 @@ class PPO(nn.Module):
         use_normalized_advantage: bool = True,
         entropy_target_factor: float = 0.0,
         use_adaptive_entropy_pen: bool = False,
+        per_layer_lr: bool = False,
     ) -> None:
 
         super().__init__()
@@ -101,38 +102,54 @@ class PPO(nn.Module):
 
         if len(params) > 0:
             optim_cls = optim.Adam
-            # optim_kwargs = dict(
-            #     params=params,
-            #     lr=lr,
-            #     eps=eps,
-            # )
-            # params = list(filter(lambda kv: ('net' not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            # net_params = list(filter(lambda kv: ('net' in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            params = list(filter(lambda kv: ('net' not in kv[0] or "visual_encoder" in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            net_params = list(filter(lambda kv: ('net' in kv[0] and "visual_encoder" not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            params = [p[1] for p in params]
-            net_params = [p[1] for p in net_params]
-            if len(net_params) == 0:
-                optim_kwargs =[ 
-                dict(
-                    params=params,
-                    lr=lr,
-                    eps=eps,
-                ), 
-                ]
+            if per_layer_lr:
+                params = list(
+                    filter(
+                        lambda kv: (
+                            "net" not in kv[0] or "visual_encoder" in kv[0]
+                        )
+                        and kv[1].requires_grad,
+                        self.named_parameters(),
+                    )
+                )
+                net_params = list(
+                    filter(
+                        lambda kv: (
+                            "net" in kv[0] and "visual_encoder" not in kv[0]
+                        )
+                        and kv[1].requires_grad,
+                        self.named_parameters(),
+                    )
+                )
+                params = [p[1] for p in params]
+                net_params = [p[1] for p in net_params]
+                if len(net_params) == 0:
+                    optim_kwargs = [
+                        dict(
+                            params=params,
+                            lr=lr,
+                            eps=eps,
+                        ),
+                    ]
+                else:
+                    optim_kwargs = [
+                        dict(
+                            params=net_params,
+                            lr=lr / 100,
+                            eps=eps,
+                        ),
+                        dict(
+                            params=params,
+                            lr=lr,
+                            eps=eps,
+                        ),
+                    ]
             else:
-                optim_kwargs =[ 
-                dict(
-                    params=net_params,
-                    lr=lr/100,
-                    eps=eps,
-                ),  
-                dict(
+                optim_kwargs = dict(
                     params=params,
                     lr=lr,
                     eps=eps,
-                ), 
-                ]
+                )
 
             signature = inspect.signature(optim_cls.__init__)
             if "foreach" in signature.parameters:
@@ -146,7 +163,7 @@ class PPO(nn.Module):
                     optim_cls = torch.optim._multi_tensor.Adam
 
             self.optimizer = optim_cls(optim_kwargs)
-             #HACK one more **
+            # HACK one more **
         else:
             self.optimizer = None
 
@@ -184,11 +201,7 @@ class PPO(nn.Module):
             for p in pg["params"]:
                 p.grad = None
 
-    def update(
-        self,
-        rollouts: RolloutStorage,
-        num_
-    ) -> Dict[str, float]:
+    def update(self, rollouts: RolloutStorage, num_) -> Dict[str, float]:
 
         advantages = self.get_advantages(rollouts)
 

@@ -25,8 +25,6 @@ TASK:
     COUNT_OBJ_COLLISIONS: true
     COUNT_ROBOT_OBJ_COLLS: false
 
-    OBJ_SUCC_THRESH: 0.3
-    ART_SUCC_THRESH: 0.15
     REWARD_MEASURE: nav_to_obj_reward
     SUCCESS_MEASURE: nav_to_obj_success
     SUCCESS_REWARD: 10.0
@@ -51,22 +49,21 @@ TASK:
         ANGLE_DIST_REWARD: 1.0
         DIST_REWARD: 1.0
         CONSTRAINT_VIOLATE_PEN: 1.0
-        FORCE_PEN: 0.0
+        FORCE_PEN: 0.0001
         MAX_FORCE_PEN: 0.01
         FORCE_END_PEN: 1.0
 
     # Success criteria
     NAV_TO_POS_SUCC:
         TYPE: NavToPosSucc
-        SUCCESS_DISTANCE: 2.0
+        SUCCESS_DISTANCE: 1.5
 
     REARRANGE_NAV_TO_OBJ_SUCCESS:
         TYPE: NavToObjSuccess
         MUST_LOOK_AT_TARG: true
-        SUCCESS_ANGLE_DIST: 0.785398 # 45 degrees.
+        SUCCESS_ANGLE_DIST: 0.261799 # 15 degrees.
         MUST_CALL_STOP: True
     MEASUREMENTS:
-    - OBJECT_TO_GOAL_DISTANCE
     - ROBOT_FORCE
     - FORCE_TERMINATE
     - ROBOT_COLLS
@@ -84,9 +81,10 @@ TASK:
 SIMULATOR:
     ADDITIONAL_OBJECT_PATHS:
     - data/objects/ycb/configs/
-    ACTION_SPACE_CONFIG: v0
     DEBUG_RENDER: false
     DEBUG_RENDER_GOAL: false
+    CONCUR_RENDER: True
+    AUTO_SLEEP: True
     AGENTS:
     - AGENT_0
     AGENT_0:
@@ -104,12 +102,6 @@ SIMULATOR:
         MIN_DEPTH: 0.0
         MAX_DEPTH: 10.0
         NORMALIZE_DEPTH: true
-    CTRL_FREQ: 120.0
-    AC_FREQ_RATIO: 4
-    FORWARD_STEP_SIZE: 0.25
-    HOLD_THRESH: 0.2
-    GRASP_IMPULSE: 10000.0
-    DEFAULT_AGENT_ID: 0
     HABITAT_SIM_V0:
         ALLOW_SLIDING: false
         ENABLE_PHYSICS: true
