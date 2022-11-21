@@ -162,7 +162,7 @@ class PPO(nn.Module):
                 else:
                     optim_cls = torch.optim._multi_tensor.Adam
 
-            self.optimizer = optim_cls(optim_kwargs)
+            self.optimizer = optim_cls(**optim_kwargs)
             # HACK one more **
         else:
             self.optimizer = None
