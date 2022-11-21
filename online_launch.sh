@@ -10,4 +10,4 @@ if [ $1 == "train" ];
 else
 	wandb offline
 fi
-srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/ddppo_pick.yaml --run-type $1
+srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/transformer_test.yaml --run-type $1

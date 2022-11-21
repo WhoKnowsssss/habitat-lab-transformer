@@ -101,38 +101,38 @@ class PPO(nn.Module):
 
         if len(params) > 0:
             optim_cls = optim.Adam
-            # optim_kwargs = dict(
-            #     params=params,
-            #     lr=lr,
-            #     eps=eps,
-            # )
+            optim_kwargs =[ dict(
+                params=params,
+                lr=lr,
+                eps=eps,
+            ) ]
             # params = list(filter(lambda kv: ('net' not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
             # net_params = list(filter(lambda kv: ('net' in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            params = list(filter(lambda kv: ('net' not in kv[0] or "visual_encoder" in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            net_params = list(filter(lambda kv: ('net' in kv[0] and "visual_encoder" not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
-            params = [p[1] for p in params]
-            net_params = [p[1] for p in net_params]
-            if len(net_params) == 0:
-                optim_kwargs =[ 
-                dict(
-                    params=params,
-                    lr=lr,
-                    eps=eps,
-                ), 
-                ]
-            else:
-                optim_kwargs =[ 
-                dict(
-                    params=net_params,
-                    lr=lr/100,
-                    eps=eps,
-                ),  
-                dict(
-                    params=params,
-                    lr=lr,
-                    eps=eps,
-                ), 
-                ]
+            # params = list(filter(lambda kv: ('net' not in kv[0] or "visual_encoder" in kv[0]) and kv[1].requires_grad, self.named_parameters()))
+            # net_params = list(filter(lambda kv: ('net' in kv[0] and "visual_encoder" not in kv[0]) and kv[1].requires_grad, self.named_parameters()))
+            # params = [p[1] for p in params]
+            # net_params = [p[1] for p in net_params]
+            # if len(net_params) == 0:
+            #     optim_kwargs =[ 
+            #     dict(
+            #         params=params,
+            #         lr=lr,
+            #         eps=eps,
+            #     ), 
+            #     ]
+            # else:
+            #     optim_kwargs =[ 
+            #     dict(
+            #         params=net_params,
+            #         lr=lr/100,
+            #         eps=eps,
+            #     ),  
+            #     dict(
+            #         params=params,
+            #         lr=lr,
+            #         eps=eps,
+            #     ), 
+            #     ]
 
             signature = inspect.signature(optim_cls.__init__)
             if "foreach" in signature.parameters:
@@ -187,7 +187,8 @@ class PPO(nn.Module):
     def update(
         self,
         rollouts: RolloutStorage,
-        num_
+        num_, 
+        value_func_iter
     ) -> Dict[str, float]:
 
         advantages = self.get_advantages(rollouts)
@@ -238,9 +239,8 @@ class PPO(nn.Module):
                     )
                 )
                 action_loss = -torch.min(surr1, surr2)
-                # if num_ < 0:
-                #     print('\n', num_)
-                #     action_loss = action_loss * 0. #HACK
+                if num_ < value_func_iter:
+                    action_loss = action_loss * 0. #HACK
 
                 values = values.float()
                 orig_values = values

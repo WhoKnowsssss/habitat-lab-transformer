@@ -1,6 +1,14 @@
 GYM:
     AUTO_NAME: "Pick"
-    OBS_KEYS: ['robot_head_depth', 'obj_start_sensor', 'joint', 'is_holding', 'relative_resting_position']
+    OBS_KEYS: 
+    - robot_head_depth
+    - relative_resting_position
+    - obj_start_sensor
+    - obj_goal_sensor
+    - obj_start_gps_compass
+    - obj_goal_gps_compass
+    - joint
+    - is_holding
 ENVIRONMENT:
     MAX_EPISODE_STEPS: 300
 DATASET:
@@ -17,6 +25,7 @@ TASK:
     BASE_ANGLE_NOISE: 0.15
     FORCE_REGENERATE: false
     SPAWN_MAX_DISTS_TO_OBJ: [2.0]
+    SPAWN_MIN_DISTS_TO_OBJ: .0
     PHYSICS_STABILITY_STEPS: 1
     NUM_SPAWN_ATTEMPTS: [200]
     SHOULD_SAVE_TO_CACHE: False
@@ -24,19 +33,30 @@ TASK:
     CONSTRAINT_VIOLATION_ENDS_EPISODE: false
     CONSTRAINT_VIOLATION_DROPS_OBJECT: True
 
+    # REWARD_MEASURE: "pick_tr_reward"
     REWARD_MEASURE: "rearrangepick_reward"
     SUCCESS_MEASURE: "rearrangepick_success"
     SUCCESS_REWARD: 10.0
-    SLACK_REWARD: -0.005
+    SLACK_REWARD: -0.001
     END_ON_SUCCESS: True
 
     JOINT_SENSOR:
         TYPE: "JointSensor"
         DIMENSIONALITY: 7
 
-    SENSORS: ["TARGET_START_SENSOR", "JOINT_SENSOR", "IS_HOLDING_SENSOR", "END_EFFECTOR_SENSOR", "RELATIVE_RESTING_POS_SENSOR"]
+    SENSORS: 
+    - RELATIVE_RESTING_POS_SENSOR
+    - TARGET_START_SENSOR
+    - GOAL_SENSOR
+    - JOINT_SENSOR
+    - IS_HOLDING_SENSOR
+    - END_EFFECTOR_SENSOR
+    - TARGET_START_GPS_COMPASS_SENSOR
+    - TARGET_GOAL_GPS_COMPASS_SENSOR
+    - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
+        # MAX_ACCUM_FORCE: -1.0 
         MAX_ACCUM_FORCE: 10_000.0
         MAX_INSTANT_FORCE: 10_000.0
     PICK_REWARD:
@@ -55,6 +75,9 @@ TASK:
         MAX_FORCE_PEN: 0.01
         FORCE_END_PEN: 1.0
 
+    # PICK_REWARD:
+    #     TYPE: "PickTrReward"
+
     PICK_SUCCESS:
         TYPE: "RearrangePickSuccess"
         EE_RESTING_SUCCESS_THRESHOLD: 0.2
@@ -71,12 +94,29 @@ TASK:
         - "NUM_STEPS"
     ACTIONS:
         ARM_ACTION:
-            GRIP_CONTROLLER: SuctionGraspAction
+            TYPE: ArmAction
+            ARM_CONTROLLER: ArmRelPosAction
+            GRIP_CONTROLLER: MagicGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
+            GRASP_THRESH_DIST: 0.15
+            DISABLE_GRIP: false
+            DELTA_POS_LIMIT: 0.0125
+            EE_CTRL_LIM: 0.015
+        BASE_VELOCITY:
+            TYPE: BaseVelAction
+            LIN_SPEED: 10.0
+            ANG_SPEED: 10.0
+            ALLOW_DYN_SLIDE: true
+            END_ON_STOP: false
+            ALLOW_BACK: true
+            MIN_ABS_LIN_SPEED: 1.0
+            MIN_ABS_ANG_SPEED: 1.0
+        REARRANGE_STOP:
+            TYPE: RearrangeStopAction
     POSSIBLE_ACTIONS:
-        - ARM_ACTION
-        - BASE_VELOCITY
-
+    - ARM_ACTION
+    - BASE_VELOCITY
+    - REARRANGE_STOP
 SIMULATOR:
     ADDITIONAL_OBJECT_PATHS:
         - "data/objects/ycb/configs/"
@@ -88,20 +128,20 @@ SIMULATOR:
     AGENT_0:
         HEIGHT: 1.5
         RADIUS: 0.3
-        JOINT_START_NOISE: 0.2
+        JOINT_START_NOISE: 0.0
         SENSORS: ['HEAD_DEPTH_SENSOR']
-        ROBOT_URDF: ./data/robots/hab_fetch/robots/hab_suction.urdf
-        ROBOT_TYPE: FetchSuctionRobot
+        ROBOT_URDF: ./data/robots/hab_fetch/robots/hab_fetch.urdf
+        ROBOT_TYPE: FetchRobot
         IK_ARM_URDF: ./data/robots/hab_fetch/robots/fetch_onlyarm.urdf
     HEAD_DEPTH_SENSOR:
-        WIDTH: 256
-        HEIGHT: 256
+        WIDTH: 128
+        HEIGHT: 128
         MIN_DEPTH: 0.0
         MAX_DEPTH: 10.0
         NORMALIZE_DEPTH: True
     HEAD_RGB_SENSOR:
-        WIDTH: 256
-        HEIGHT: 256
+        WIDTH: 128
+        HEIGHT: 128
     ARM_DEPTH_SENSOR:
         HEIGHT: 128
         MAX_DEPTH: 10.0
@@ -113,10 +153,10 @@ SIMULATOR:
         WIDTH: 128
 
     HABITAT_SIM_V0:
-        ALLOW_SLIDING: False
+        ALLOW_SLIDING: True
         ENABLE_PHYSICS: True
         GPU_DEVICE_ID: 0
         GPU_GPU: False
         PHYSICS_CONFIG_FILE: ./data/default.physics_config.json
-    SEED: 100
+    SEED: 98
     TYPE: RearrangeSim-v0
