@@ -17,9 +17,10 @@ from habitat.tasks.rearrange.utils import (
     CollisionDetails,
     UsesRobotInterface,
     batch_transform_point,
+    get_angle_to_pos,
     rearrange_logger,
 )
-from habitat.tasks.utils import cartesian_to_polar, get_angle
+from habitat.tasks.utils import cartesian_to_polar
 
 
 class MultiObjSensor(PointGoalSensor):
@@ -371,14 +372,7 @@ class LocalizationSensor(UsesRobotInterface, Sensor):
         robot = self._sim.get_robot_data(self.robot_id).robot
         T = robot.base_transformation
         forward = np.array([1.0, 0, 0])
-        heading = np.array(T.transform_vector(forward))
-        forward = forward[[0, 2]]
-        heading = heading[[0, 2]]
-
-        heading_angle = get_angle(forward, heading)
-        c = np.cross(forward, heading) < 0
-        if not c:
-            heading_angle = -1.0 * heading_angle
+        heading_angle = get_angle_to_pos(T.transform_vector(forward))
         return np.array([*robot.base_pos, heading_angle], dtype=np.float32)
 
 
@@ -515,6 +509,33 @@ class ObjAtGoal(Measure):
             str(idx): dist < self._config.SUCC_THRESH
             for idx, dist in obj_to_goal_dists.items()
         }
+
+
+@registry.register_measure
+class EndEffectorToGoalDistance(UsesRobotInterface, Measure):
+    cls_uuid: str = "ee_to_goal_distance"
+
+    def __init__(self, sim, *args, **kwargs):
+        self._sim = sim
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _get_uuid(*args, **kwargs):
+        return EndEffectorToGoalDistance.cls_uuid
+
+    def reset_metric(self, *args, episode, **kwargs):
+        self.update_metric(*args, episode=episode, **kwargs)
+
+    def update_metric(self, *args, observations, **kwargs):
+        ee_pos = self._sim.get_robot_data(
+            self.robot_id
+        ).robot.ee_transform.translation
+
+        idxs, goals = self._sim.get_targets()
+
+        distances = np.linalg.norm(goals - ee_pos, ord=2, axis=-1)
+
+        self._metric = {str(idx): dist for idx, dist in zip(idxs, distances)}
 
 
 @registry.register_measure

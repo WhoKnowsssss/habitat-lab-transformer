@@ -196,8 +196,8 @@ class PPOTrainer(BaseRLTrainer):
 
         if self.config.RL.DDPPO.reset_critic:
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
-            nn.init.constant_(self.actor_critic.critic.fc.bias, 0.1)
-        
+            nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
+
         # with torch.no_grad():
         #     self.actor_critic.action_distribution.std[:] = -1
 
@@ -354,7 +354,6 @@ class PPOTrainer(BaseRLTrainer):
         self.env_time = 0.0
         self.pth_time = 0.0
         self.t_start = time.time()
-
 
     @rank0_only
     @profiling_wrapper.RangeContext("save_checkpoint")
@@ -760,11 +759,10 @@ class PPOTrainer(BaseRLTrainer):
                 lr_lambda=lambda x: 1 - self.percent_done(),
             )
 
-        
-
         if self._is_distributed:
             torch.distributed.barrier()
 
+        resume_run_id = None
         if resume_state is not None:
             self.agent.load_state_dict(resume_state["state_dict"])
             # self.agent.optimizer.load_state_dict(resume_state["optim_state"])
@@ -785,12 +783,14 @@ class PPOTrainer(BaseRLTrainer):
             self.window_episode_stats.update(
                 requeue_stats["window_episode_stats"]
             )
+            resume_run_id = requeue_stats.get("run_id", None)
 
         ppo_cfg = self.config.RL.PPO
 
         with (
             get_writer(
                 self.config,
+                resume_run_id=resume_run_id,
                 flush_secs=self.flush_secs,
                 purge_step=int(self.num_steps_done),
             )
@@ -817,6 +817,7 @@ class PPOTrainer(BaseRLTrainer):
                         prev_time=(time.time() - self.t_start) + prev_time,
                         running_episode_stats=self.running_episode_stats,
                         window_episode_stats=dict(self.window_episode_stats),
+                        resume_run_id=writer.get_run_id(),
                     )
 
                     save_resume_state(
@@ -985,8 +986,9 @@ class PPOTrainer(BaseRLTrainer):
         self._setup_actor_critic_agent(ppo_cfg)
 
         if self.agent.actor_critic.should_load_agent_state:
-            self.agent.load_state_dict(ckpt_dict["state_dict"], 
-            strict=False
+            self.agent.load_state_dict(
+                ckpt_dict["state_dict"], 
+                strict=False
             )
         self.actor_critic = self.agent.actor_critic
 
@@ -1184,8 +1186,8 @@ class PPOTrainer(BaseRLTrainer):
                             [v[stat_key] for v in stats_episodes.values()]
                         )
                     for k in aggregated_stats.keys():
-                        if 'success' in k:
-                            print('\n\n', k, '\n\n', aggregated_stats[k])
+                        if "success" in k:
+                            print("\n\n", k, "\n\n", aggregated_stats[k])
 
             not_done_masks = not_done_masks.to(device=self.device)
             (

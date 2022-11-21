@@ -207,6 +207,7 @@ _C.RL.PPO.hidden_size = 512
 _C.RL.PPO.entropy_target_factor = 0.0
 _C.RL.PPO.use_adaptive_entropy_pen = False
 _C.RL.PPO.use_clipped_value_loss = True
+_C.RL.PPO.per_layer_lr = False
 # Use double buffered sampling, typically helps
 # when environment time is similar or large than
 # policy inference time during rollout generation

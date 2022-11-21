@@ -5,6 +5,7 @@ import torch
 
 from habitat.tasks.rearrange.rearrange_sensors import IsHoldingSensor
 from habitat_baselines.common.logging import baselines_logger
+from habitat_baselines.rl.hrl.utils import find_action_range
 from habitat_baselines.rl.ppo.policy import Policy
 from habitat_baselines.utils.common import get_num_actions
 
@@ -43,6 +44,9 @@ class SkillPolicy(Policy):
                 break
         if not found_grip:
             raise ValueError(f"Could not find grip action in {action_space}")
+        self._stop_action_idx, _ = find_action_range(
+            action_space, "REARRANGE_STOP"
+        )
 
     def _internal_log(self, s, observations=None):
         baselines_logger.debug(
