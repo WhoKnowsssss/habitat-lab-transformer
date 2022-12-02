@@ -44,6 +44,7 @@ class HierarchicalPolicy(Policy):
 
         self._action_space = action_space
         self._num_envs: int = num_envs
+        self._hidden_size = full_config.RL.PPO.hidden_size
 
         # Maps (skill idx -> skill)
         self._skills: Dict[int, SkillPolicy] = {}
@@ -90,6 +91,10 @@ class HierarchicalPolicy(Policy):
         self._stop_action_idx, _ = find_action_range(
             action_space, "REARRANGE_STOP"
         )
+
+    @property
+    def hidden_state_hxs_dim(self):
+        return self._hidden_size
 
     def eval(self):
         pass

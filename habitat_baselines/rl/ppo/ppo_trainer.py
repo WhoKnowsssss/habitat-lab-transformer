@@ -996,8 +996,8 @@ class PPOTrainer(BaseRLTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
-            30,
-            self.actor_critic.net.hidden_state_hxs_dim,
+            self.actor_critic.num_recurrent_layers,
+            self.actor_critic.hidden_state_hxs_dim,
             device=self.device,
         )
         prev_actions = torch.zeros(
@@ -1182,9 +1182,6 @@ class PPOTrainer(BaseRLTrainer):
                         aggregated_stats[stat_key] = np.mean(
                             [v[stat_key] for v in stats_episodes.values()]
                         )
-                    for k in aggregated_stats.keys():
-                        if "success" in k:
-                            print("\n\n", k, "\n\n", aggregated_stats[k])
 
             not_done_masks = not_done_masks.to(device=self.device)
             (

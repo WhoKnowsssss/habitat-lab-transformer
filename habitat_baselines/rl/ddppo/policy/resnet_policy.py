@@ -84,6 +84,10 @@ class PointNavResNetPolicy(NetPolicy):
             aux_loss_config=aux_loss_config,
         )
 
+    @property
+    def hidden_state_hxs_dim(self):
+        return self.net._hidden_size
+
     @classmethod
     def from_config(
         cls,
@@ -437,10 +441,6 @@ class PointNavResNetNet(Net):
     @property
     def num_recurrent_layers(self):
         return self.state_encoder.num_recurrent_layers
-
-    @property
-    def hidden_state_hxs_dim(self):
-        return self._hidden_size
 
     @property
     def perception_embedding_size(self):
