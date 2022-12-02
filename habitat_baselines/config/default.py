@@ -120,7 +120,7 @@ _C.RL.POLICY.ACTION_DIST.clamp_std = True
 _C.RL.POLICY.ACTION_DIST.min_std = 1e-6
 _C.RL.POLICY.ACTION_DIST.max_std = 1
 _C.RL.POLICY.ACTION_DIST.min_log_std = -5
-_C.RL.POLICY.ACTION_DIST.max_log_std = 2
+_C.RL.POLICY.ACTION_DIST.max_log_std = -1
 # For continuous action distributions (including gaussian):
 _C.RL.POLICY.ACTION_DIST.action_activation = "tanh"  # ['tanh', '']
 _C.RL.POLICY.ACTION_DIST.scheduled_std = False

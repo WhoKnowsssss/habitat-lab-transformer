@@ -151,7 +151,7 @@ class ResNetEncoder(nn.Module):
             observation_space.spaces[k].shape[2] for k in self.visual_keys
         )
 
-        if self._n_input_channels > 0:
+        if False:
             self.running_mean_and_var: nn.Module = RunningMeanAndVar(
                 self._n_input_channels
             )
@@ -437,6 +437,10 @@ class PointNavResNetNet(Net):
     @property
     def is_blind(self):
         return self.visual_encoder.is_blind
+
+    @property
+    def hidden_state_hxs_dim(self):
+        return self._hidden_size
 
     @property
     def num_recurrent_layers(self):

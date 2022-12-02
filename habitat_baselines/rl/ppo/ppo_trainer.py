@@ -63,6 +63,7 @@ from habitat_baselines.rl.ppo.policy import NetPolicy
 from habitat_baselines.utils.common import (
     batch_obs,
     generate_video,
+    cosine_decay,
     get_num_actions,
     inference_mode,
     is_continuous_action_space,
@@ -163,7 +164,7 @@ class PPOTrainer(BaseRLTrainer):
                     k[len("actor_critic.") :]: v
                     for k, v in pretrained_state["state_dict"].items()
                 },
-                # strict=False
+                strict=False,
             )
         elif self.config.RL.DDPPO.pretrained_encoder:
             prefix = "actor_critic.net.visual_encoder."
@@ -179,6 +180,12 @@ class PPOTrainer(BaseRLTrainer):
             # self._static_encoder = True
             for param in self.actor_critic.net.visual_encoder.parameters():
                 param.requires_grad_(False)
+
+        for layer_id in self.config.RL.TRANSFORMER.freeze_layer:
+            for name, param in self.actor_critic.net.state_encoder.blocks[
+                layer_id
+            ].named_parameters():
+                param.requires_grad = False
 
         # for name, param in self.actor_critic.net.named_parameters():
         #     param.requires_grad = False
@@ -597,7 +604,11 @@ class PPOTrainer(BaseRLTrainer):
 
         self.agent.train()
 
-        losses = self.agent.update(self.rollouts, self.num_updates_done)
+        losses = self.agent.update(
+            self.rollouts,
+            self.num_updates_done,
+            self.config.RL.PPO.value_func_warmup,
+        )
 
         self.rollouts.after_update()
         self.pth_time += time.time() - t_update_model
@@ -670,6 +681,11 @@ class PPOTrainer(BaseRLTrainer):
             writer.add_scalar(f"metrics/{k}", v, self.num_steps_done)
         for k, v in losses.items():
             writer.add_scalar(f"learner/{k}", v, self.num_steps_done)
+        writer.add_scalar(
+            f"learner/learning_rate",
+            self.agent.optimizer.param_groups[0]["lr"],
+            self.num_steps_done,
+        )
 
         # for k, v in metrics.items():
         #     print(f"metrics/{k}: {v}, ", self.num_steps_done)
@@ -737,6 +753,11 @@ class PPOTrainer(BaseRLTrainer):
 
         if self.config.RL.PPO.use_warmup_linear_lr_decay:
             warmup_updates = self.config.RL.PPO.warmup_updates
+            # lr_scheduler = LambdaLR(
+            #     optimizer=self.agent.optimizer,
+            #     lr_lambda=lambda x: min(self.num_updates_done - warmup_updates, 0) / warmup_updates + 1
+            #     if self.num_updates_done < warmup_updates else 1 - (self.num_updates_done - warmup_updates) / 3000, # was 6000
+            # )
             lr_scheduler = LambdaLR(
                 optimizer=self.agent.optimizer,
                 lr_lambda=lambda x: min(
@@ -745,7 +766,9 @@ class PPOTrainer(BaseRLTrainer):
                 / warmup_updates
                 + 1
                 if self.num_updates_done < warmup_updates
-                else 1 - self.percent_done(),
+                else cosine_decay(
+                    (self.num_updates_done - warmup_updates) / 3000
+                ),
             )
         else:
             lr_scheduler = LambdaLR(
@@ -980,10 +1003,7 @@ class PPOTrainer(BaseRLTrainer):
         self._setup_actor_critic_agent(ppo_cfg)
 
         if self.agent.actor_critic.should_load_agent_state:
-            self.agent.load_state_dict(
-                ckpt_dict["state_dict"],
-                # strict=False
-            )
+            self.agent.load_state_dict(ckpt_dict["state_dict"], strict=False)
         self.actor_critic = self.agent.actor_critic
 
         observations = self.envs.reset()
@@ -1062,7 +1082,7 @@ class PPOTrainer(BaseRLTrainer):
                     test_recurrent_hidden_states,
                     prev_actions,
                     not_done_masks,
-                    deterministic=True,
+                    # deterministic=True,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore

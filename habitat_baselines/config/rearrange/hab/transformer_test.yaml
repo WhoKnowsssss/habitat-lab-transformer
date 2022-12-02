@@ -3,8 +3,8 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/pick.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-# VIDEO_OPTION: [] #"disk"
-VIDEO_OPTION: ["disk"] #
+VIDEO_OPTION: []
+# VIDEO_OPTION: ["disk"] #
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/npnp_25k_train"
 VIDEO_FPS: 30
@@ -13,12 +13,12 @@ VIDEO_RENDER_ALL_INFO: True
 VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/npnp_online_lstm_ref7" #nav_pick_nav_place_nn_2
-NUM_ENVIRONMENTS: 2
+EVAL_CKPT_PATH_DIR: "data/ckpts/npnp_online_contd_3"
+NUM_ENVIRONMENTS: 32
 WRITER_TYPE: 'wb'
 # Visual sensors to include
 SENSORS: ["HEAD_DEPTH_SENSOR"]
-CHECKPOINT_FOLDER: "data/ckpts/npnp_online_lstm_ref8"
+CHECKPOINT_FOLDER: "data/ckpts/npnp_online_contd_3"
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 1.0e8
 LOG_INTERVAL: 10
@@ -35,6 +35,7 @@ RL:
       ACTION_DIST:
         discrete_arm: true
         discrete_base: false
+        use_std_param: true
       # action_distribution_type: "gaussian"
       # ACTION_DIST:
         log_std_init: -1.0
@@ -46,10 +47,11 @@ RL:
 
   TRANSFORMER:
     return_to_go: 100
-    context_length: 10
+    context_length: 30 #10
     model_type: "bc"
-    n_head: 1
-    n_layer: 1
+    n_head: 8
+    n_layer: 6
+    freeze_layer: [0,1,2,3] #
     reg_flags: 
       outer_dropout: false
       outer_layernorm: true
@@ -62,22 +64,25 @@ RL:
 
   PPO:
     # ppo params
-    clip_param: 0.2
+    clip_param: 0.1
     ppo_epoch: 2
     num_mini_batch: 2
-    value_loss_coef: 0.5
-    entropy_coef: 0.0005
-    lr: 5e-5
+    value_loss_coef: .5
+    entropy_coef: 0.000 # 0.0005
+    lr: 1e-6
     eps: 1e-5
-    max_grad_norm: 0.2
+    max_grad_norm: 0.1
     num_steps: 128
     use_gae: True
     gamma: 0.99
     tau: 0.95
     use_linear_clip_decay: False
     use_linear_lr_decay: True
-    warmup_updates: 500
+    use_warmup_linear_lr_decay: True
+    warmup_updates: 1
     reward_window_size: 50
+
+    value_func_warmup: 200
 
     use_normalized_advantage: True
 
@@ -93,14 +98,15 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    # pretrained_weights: "data/ckpts/npnp_25k_offline_embd_obsatt_2/ckpt.22.pth" #
-    pretrained_weights: "data/ckpts/npnp_online_lstm_ref5/ckpt.7.pth" #
+    pretrained_weights: "data/ckpts/npnp_25k_offline_embd_obsatt_2/ckpt.22.pth" #
+    # pretrained_weights: "data/ckpts/npnp_online_pretrained_2/ckpt.8.pth" #
+    # pretrained_weights: "data/ckpts/npnp_online_scratch_2/ckpt.7.pth" #
     # Initialize with pretrained weights
-    pretrained: False
+    pretrained: True
     # Initialize just the visual encoder backbone with pretrained weights
     pretrained_encoder: False
     # Whether or not the visual encoder backbone will be trained.
-    train_encoder: True
+    train_encoder: False
     # Whether or not to reset the critic linear layer
     reset_critic: False
 
@@ -113,7 +119,7 @@ RL:
 
 WB:
   PROJECT_NAME: "p-skill-transformer"
-  # ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "trfm_no_drop"
-  GROUP: "nav_pick_nav_place_online"
+  ENTITY: "cvmlp-whoknowsss"
+  RUN_NAME: "lr=1e-6-ref-2"
+  GROUP: "trfm_pretrained_new"
 

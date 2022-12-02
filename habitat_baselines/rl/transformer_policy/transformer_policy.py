@@ -26,7 +26,7 @@ from habitat.tasks.nav.nav import (
 from habitat_baselines.rl.ddppo.policy.resnet_policy import ResNetEncoder
 from habitat_baselines.rl.ddppo.policy import resnet
 from habitat_baselines.rl.ppo.policy import Policy
-from habitat_baselines.rl.transformer_policy.transformer_model import (
+from habitat_baselines.rl.transformer_policy.transformer_model_orig import (
     GPTConfig,
     GPT,
 )
@@ -179,7 +179,6 @@ class TransformerResNetPolicy(NetPolicy):
             masks,
             deterministic=deterministic,
         )
-        
         if self.action_distribution_type == "mixed":
             action[:, :7] = self.boundaries_mean[action[:, :7].to(torch.long)]
             action[:, 7] = (
@@ -190,7 +189,6 @@ class TransformerResNetPolicy(NetPolicy):
             )
             mask = action[:,7:8] == -1
             action = torch.cat([action, torch.zeros_like(mask.float())], dim=-1)
-
         # #============= advance hidden state ===============
         mask = ~torch.any(
                 (rnn_hidden_states.sum(-1) == 0), -1
@@ -330,6 +328,7 @@ class TransformerResnetNet(nn.Module):
     ):
         super().__init__()
         self.context_length = context_length
+        context_length = 30
 
         self.discrete_actions = discrete_actions
         if discrete_actions:
