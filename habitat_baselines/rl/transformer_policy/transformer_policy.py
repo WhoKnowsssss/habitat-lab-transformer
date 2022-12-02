@@ -30,6 +30,7 @@ from habitat_baselines.rl.transformer_policy.transformer_model_orig import (
     GPTConfig,
     GPT,
 )
+
 # from habitat_baselines.rl.models.rnn_state_encoder import (
 #     build_rnn_state_encoder,
 # )
@@ -46,6 +47,7 @@ from habitat.core.spaces import ActionSpace, EmptySpace
 
 from .focal_loss import FocalLoss
 
+
 @baseline_registry.register_policy
 class TransformerResNetPolicy(NetPolicy):
     def __init__(
@@ -57,7 +59,7 @@ class TransformerResNetPolicy(NetPolicy):
         max_episode_step: int = 200,
         n_layer: int = 6,
         n_head: int = 8,
-        reg_flags = None, 
+        reg_flags=None,
         model_type: str = "reward_conditioned",
         resnet_baseplanes: int = 32,
         backbone: str = "resnet18",
@@ -101,10 +103,30 @@ class TransformerResNetPolicy(NetPolicy):
         if self.offline_training:
             self.loss_vars = nn.parameter.Parameter(torch.zeros((3,)))
             self.focal_loss = FocalLoss(
-                alpha=(1-torch.tensor([0.05,0.0125,0.0125,0.0125,0.0125,0.8,0.0125,0.0125,0.0125,0.0125,0.05])), gamma=5).cuda()
+                alpha=(
+                    1
+                    - torch.tensor(
+                        [
+                            0.05,
+                            0.0125,
+                            0.0125,
+                            0.0125,
+                            0.0125,
+                            0.8,
+                            0.0125,
+                            0.0125,
+                            0.0125,
+                            0.0125,
+                            0.05,
+                        ]
+                    )
+                ),
+                gamma=5,
+            ).cuda()
             self.focal_loss_loc = FocalLoss(gamma=5).cuda()
             self.focal_loss_pick = FocalLoss(
-                alpha=(1-torch.tensor([0.8,0.1,0.1])), gamma=5).cuda()
+                alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
+            ).cuda()
 
         if self.action_distribution_type == "categorical":
             self.len_logit = [11 * 7, 3, 11 * 2]
@@ -161,7 +183,6 @@ class TransformerResNetPolicy(NetPolicy):
             policy_config=config.RL.POLICY,
             fuse_keys=config.TASK_CONFIG.GYM.OBS_KEYS,
             # fuse_keys=config.RL.GYM_OBS_KEYS
-
         )
 
     def act(
@@ -187,12 +208,12 @@ class TransformerResNetPolicy(NetPolicy):
                 + 3 * (action[:, 7] == 2).int()
                 - 2
             )
-            mask = action[:,7:8] == -1
-            action = torch.cat([action, torch.zeros_like(mask.float())], dim=-1)
+            mask = action[:, 7:8] == -1
+            action = torch.cat(
+                [action, torch.zeros_like(mask.float())], dim=-1
+            )
         # #============= advance hidden state ===============
-        mask = ~torch.any(
-                (rnn_hidden_states.sum(-1) == 0), -1
-        )
+        mask = ~torch.any((rnn_hidden_states.sum(-1) == 0), -1)
         rnn_hidden_states[mask] = rnn_hidden_states[mask].roll(-1, 1)
         rnn_hidden_states[mask, -1, :] = 0
 
@@ -214,7 +235,7 @@ class TransformerResNetPolicy(NetPolicy):
         evaluate_aux_losses=True,
     ):
         if self.action_distribution_type == "mixed":
-            action = action[:,:10]
+            action = action[:, :10]
             action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
             action[:, 7] = (
                 (action[:, 7] == 0).int()
@@ -259,47 +280,60 @@ class TransformerResNetPolicy(NetPolicy):
         else:
             raise NotImplementedError
 
-        #======================== separate logits ==========================
-        logits_arm, logits_pick, logits_loc = torch.split(logits, self.len_logit, -1)
-        
-        #=========================== locomotion ============================
-        temp_target = targets[:,:,8:10]
+        # ======================== separate logits ==========================
+        logits_arm, logits_pick, logits_loc = torch.split(
+            logits, self.len_logit, -1
+        )
+
+        # =========================== locomotion ============================
+        temp_target = targets[:, :, 8:10]
         loss1 = F.mse_loss(logits_loc, temp_target)
 
-        #=========================== arm action ============================
-        temp_target = torch.bucketize(targets[:,:,:7], self.boundaries) - 1
+        # =========================== arm action ============================
+        temp_target = torch.bucketize(targets[:, :, :7], self.boundaries) - 1
         logits_arm = logits_arm.view(*logits_arm.shape[:2], 7, 11)
-        loss2 = self.focal_loss(logits_arm[:,:,:,:].permute(0,3,1,2), temp_target[:,:,:7])
-        accuracy2 = torch.sum(torch.argmax(logits_arm[:,:,:,:], dim=-1) == temp_target[:,:,:7]) / np.prod(temp_target[:,:,:7].shape)
+        loss2 = self.focal_loss(
+            logits_arm[:, :, :, :].permute(0, 3, 1, 2), temp_target[:, :, :7]
+        )
+        accuracy2 = torch.sum(
+            torch.argmax(logits_arm[:, :, :, :], dim=-1)
+            == temp_target[:, :, :7]
+        ) / np.prod(temp_target[:, :, :7].shape)
 
-        #========================= gripper action ==========================
-        loss3 = self.focal_loss_pick(logits_pick.permute(0,2,1), targets[:,:,10].long())
-        accuracy3 = torch.sum(torch.argmax(logits_pick[:,:,:], dim=-1) == targets[:,:,10].long()) / np.prod(targets[:,:,10].shape)
+        # ========================= gripper action ==========================
+        loss3 = self.focal_loss_pick(
+            logits_pick.permute(0, 2, 1), targets[:, :, 10].long()
+        )
+        accuracy3 = torch.sum(
+            torch.argmax(logits_pick[:, :, :], dim=-1)
+            == targets[:, :, 10].long()
+        ) / np.prod(targets[:, :, 10].shape)
 
-        #========================== stop action ============================
+        # ========================== stop action ============================
         # loss4 = F.cross_entropy(logits_stop.permute(0,2,1), targets[:,:,10].long(), label_smoothing=0.05)
         # accuracy4 = torch.sum(torch.argmax(logits_stop[:,:,:], dim=-1) == targets[:,:,10].long()) / np.prod(targets[:,:,10].shape)
 
-        #========================== planner action ============================
+        # ========================== planner action ============================
         # loss_p = F.cross_entropy(planner_logits.permute(0,2,1), targets[:,:,11].long(), label_smoothing=0.05)
         # accuracy_p = torch.sum(torch.argmax(planner_logits[:,:,:], dim=-1) == targets[:,:,11].long()) / np.prod(targets[:,:,11].shape)
 
         loss_dict = {
-            "locomotion": loss1.detach().item(), 
-            "arm": loss2.detach().item(), 
-            "pick": loss3.detach().item(), 
+            "locomotion": loss1.detach().item(),
+            "arm": loss2.detach().item(),
+            "pick": loss3.detach().item(),
             # "place": loss4.detach().item(),
             # "accuracy_nav": accuracy1.detach().item(),
             "accuracy_pick": accuracy3.detach().item(),
             "accuracy_arm": accuracy2.detach().item(),
             # "accuracy_place": accuracy4.detach().item(),
-            } 
+        }
         loss1 = torch.exp(-self.loss_vars[0]) * loss1 + self.loss_vars[0]
         loss2 = torch.exp(-self.loss_vars[1]) * loss2 + self.loss_vars[1]
         loss3 = torch.exp(-self.loss_vars[2]) * loss3 + self.loss_vars[2]
         # loss4 = torch.exp(-self.loss_vars[2]) * loss4 + self.loss_vars[2]
-        loss = loss1 + loss2 + loss3 #+ loss4
+        loss = loss1 + loss2 + loss3  # + loss4
         return loss, loss_dict
+
 
 class TransformerResnetNet(nn.Module):
     """Network which passes the input image through CNN and concatenates
@@ -323,8 +357,8 @@ class TransformerResnetNet(nn.Module):
         discrete_actions: bool = True,
         fuse_keys: Optional[List[str]] = None,
         include_visual_keys: Optional[List[str]] = None,
-        use_rgb = False,
-        num_skills = 10
+        use_rgb=False,
+        num_skills=10,
     ):
         super().__init__()
         self.context_length = context_length
@@ -371,6 +405,7 @@ class TransformerResnetNet(nn.Module):
                 baseplanes=resnet_baseplanes,
                 ngroups=resnet_baseplanes // 2,
                 make_backbone=getattr(resnet, backbone),
+                use_input_norm=False,
             )
         else:
             self.visual_encoder_rgb = None
@@ -396,6 +431,7 @@ class TransformerResnetNet(nn.Module):
             baseplanes=resnet_baseplanes,
             ngroups=resnet_baseplanes // 2,
             make_backbone=getattr(resnet, backbone),
+            use_input_norm=False,
         )
 
         if not self.visual_encoder.is_blind:
@@ -403,7 +439,8 @@ class TransformerResnetNet(nn.Module):
                 self.visual_fc_rgb = nn.Sequential(
                     nn.Flatten(),
                     nn.Linear(
-                        np.prod(self.visual_encoder_rgb.output_shape), hidden_size//2
+                        np.prod(self.visual_encoder_rgb.output_shape),
+                        hidden_size // 2,
                     ),
                     nn.ReLU(True),
                 )
@@ -413,12 +450,13 @@ class TransformerResnetNet(nn.Module):
                         np.prod(self.visual_encoder.output_shape), hidden_size
                     ),
                     nn.ReLU(True),
-            )
+                )
             else:
                 self.visual_fc = nn.Sequential(
                     nn.Flatten(),
                     nn.Linear(
-                        np.prod(self.visual_encoder.output_shape), hidden_size // 2
+                        np.prod(self.visual_encoder.output_shape),
+                        hidden_size // 2,
                     ),
                     nn.ReLU(True),
                 )
@@ -426,7 +464,9 @@ class TransformerResnetNet(nn.Module):
         self._hxs_dim += 1 if num_skills != 0 else 0
         self._num_actions = num_actions
         self.action_dim = self._num_actions
-        self.obs_dim = self._num_actions + 1 if num_skills != 0 else self._num_actions
+        self.obs_dim = (
+            self._num_actions + 1 if num_skills != 0 else self._num_actions
+        )
         mconf = GPTConfig(
             num_actions,
             context_length,
@@ -440,7 +480,7 @@ class TransformerResnetNet(nn.Module):
             model_type=model_type,
             max_timestep=max_episode_step,
             num_skills=num_skills,
-            use_rgb = use_rgb,
+            use_rgb=use_rgb,
             reg_flags=reg_flags,
         )  # 6,8
         self.state_encoder = GPT(mconf)
@@ -464,7 +504,7 @@ class TransformerResnetNet(nn.Module):
             n_embd=self._hidden_size,
             model_type=model_type,
             max_timestep=max_episode_step,
-            num_skills=num_skills, 
+            num_skills=num_skills,
             use_rgb=use_rgb,
         )  # 6,8
         # self.planner_encoder = GPT(mconf)
@@ -551,9 +591,12 @@ class TransformerResnetNet(nn.Module):
             # Move valid state-action-reward pair to the left
             # out2 = self.planner_encoder(x)
             out2 = None
-            if 'skill' in observations.keys():
+            if "skill" in observations.keys():
                 # assert offline_training, "shouldn't include this in online training or evaluation"
-                x = torch.cat([x, observations['skill'].reshape(B, -1, 1).float()], dim=-1)
+                x = torch.cat(
+                    [x, observations["skill"].reshape(B, -1, 1).float()],
+                    dim=-1,
+                )
             out = self.state_encoder(
                 x,
                 prev_actions,
@@ -593,10 +636,10 @@ class TransformerResnetNet(nn.Module):
 
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
-        ] = observations['is_holding'].reshape(B)
+        ] = observations["is_holding"].reshape(B)
 
         rnn_hidden_states = rnn_hidden_states.contiguous()
-        
+
         out = self.state_encoder(
             rnn_hidden_states[..., :-action_dim],
             rnn_hidden_states[..., -action_dim:],

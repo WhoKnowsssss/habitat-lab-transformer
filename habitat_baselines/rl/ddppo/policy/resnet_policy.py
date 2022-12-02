@@ -132,6 +132,7 @@ class ResNetEncoder(nn.Module):
         ngroups: int = 32,
         spatial_size: int = 128,
         make_backbone=None,
+        use_input_norm=True,
     ):
         super().__init__()
 
@@ -151,7 +152,7 @@ class ResNetEncoder(nn.Module):
             observation_space.spaces[k].shape[2] for k in self.visual_keys
         )
 
-        if False:
+        if self._n_input_channels > 0 and use_input_norm:
             self.running_mean_and_var: nn.Module = RunningMeanAndVar(
                 self._n_input_channels
             )
