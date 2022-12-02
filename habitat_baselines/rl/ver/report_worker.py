@@ -81,7 +81,9 @@ class ReportWorkerProcess(ProcessBase):
                 running_frames_window=self.running_frames_window,
                 running_time_window=self.running_time_window,
                 n_update_reports=self.n_update_reports,
-                run_id=self.run_id,
+                run_id=self.writer.get_run_id()
+                if self.writer is not None
+                else None,
             )
         )
 
@@ -94,6 +96,7 @@ class ReportWorkerProcess(ProcessBase):
         self.running_frames_window = state_dict["running_frames_window"]
         self.running_time_window = state_dict["running_time_window"]
         self.n_update_reports = state_dict["n_update_reports"]
+        self.run_id = state_dict.get("run_id", None)
 
     @property
     def world_size(self) -> int:
@@ -392,7 +395,6 @@ class ReportWorker(WorkerBase):
         report_queue: BatchedQueue,
         my_t_zero: float,
         init_num_steps=0,
-        run_id=None,
     ):
         self.num_steps_done = torch.full(
             (), int(init_num_steps), dtype=torch.int64
@@ -401,7 +403,6 @@ class ReportWorker(WorkerBase):
         self.num_steps_done.share_memory_()
         self.time_taken.share_memory_()
         self.report_queue = report_queue
-        self.run_id = run_id
         super().__init__(
             mp_ctx,
             ReportWorkerProcess,
