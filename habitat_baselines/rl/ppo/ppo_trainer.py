@@ -181,11 +181,12 @@ class PPOTrainer(BaseRLTrainer):
             for param in self.actor_critic.net.visual_encoder.parameters():
                 param.requires_grad_(False)
 
-        for layer_id in self.config.RL.TRANSFORMER.freeze_layer:
-            for name, param in self.actor_critic.net.state_encoder.blocks[
-                layer_id
-            ].named_parameters():
-                param.requires_grad = False
+        if "TRANSFORMER" in self.config.RL:
+            for layer_id in self.config.RL.TRANSFORMER.freeze_layer:
+                for name, param in self.actor_critic.net.state_encoder.blocks[
+                    layer_id
+                ].named_parameters():
+                    param.requires_grad = False
 
         # for name, param in self.actor_critic.net.named_parameters():
         #     param.requires_grad = False
