@@ -32,6 +32,14 @@ class Predicate:
         self._args = args
         self._arg_values = None
 
+    @property
+    def arg_values(self):
+        return self._arg_values
+
+    @property
+    def args(self):
+        return self._args
+
     def are_args_compatible(self, arg_values: List[PddlEntity]):
         """
         Checks if the list of argument values matches the types and counts of

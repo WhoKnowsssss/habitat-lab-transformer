@@ -1,5 +1,5 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
@@ -26,12 +26,37 @@ EVAL_KEYS_TO_INCLUDE_IN_NAME: ['did_pick_object', 'composite_success']
 EVAL:
   USE_CKPT_CONFIG: False
   SHOULD_LOAD_CKPT: False
+TASK_CONFIG:
+  TASK:
+    SENSORS:
+      - RELATIVE_RESTING_POS_SENSOR
+      - TARGET_START_SENSOR
+      - GOAL_SENSOR
+      - JOINT_SENSOR
+      - IS_HOLDING_SENSOR
+      - END_EFFECTOR_SENSOR
+      - TARGET_START_GPS_COMPASS_SENSOR
+      - TARGET_GOAL_GPS_COMPASS_SENSOR
+      - GLOBAL_PREDICATE_SENSOR 
+  GYM:
+    OBS_KEYS:
+      - robot_head_depth
+      - relative_resting_position
+      - obj_start_sensor
+      - obj_goal_sensor
+      - obj_start_gps_compass
+      - obj_goal_gps_compass
+      - joint
+      - is_holding
+      - ee_pos
+      - all_predicates
+
 
 RL:
   POLICY:
       name: "HierarchicalPolicy"
       high_level_policy:
-        name: "FixedHighLevelPolicy"
+        name: "StripsHighLevelPolicy"
         add_arm_rest: True
       OBS_TRANSFORMS:
         ENABLED_TRANSFORMS: ['AddVirtualKeys']
@@ -44,7 +69,7 @@ RL:
           action_distribution_type: "gaussian"
           AT_RESTING_THRESHOLD: 0.15
           OBS_SKILL_INPUTS: []
-          LOAD_CKPT_FILE: "data/models/open_cab.pth"
+          LOAD_CKPT_FILE: "data/models/opencab.pth"
           MAX_SKILL_STEPS: 200
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: True
@@ -55,7 +80,7 @@ RL:
           action_distribution_type: "gaussian"
           AT_RESTING_THRESHOLD: 0.15
           OBS_SKILL_INPUTS: []
-          LOAD_CKPT_FILE: "data/models/open_fridge.pth"
+          LOAD_CKPT_FILE: "data/models/openfridge.pth"
           MAX_SKILL_STEPS: 200
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: True
@@ -129,8 +154,8 @@ RL:
         # Uncomment if you are also using these skills
         # close_cab: "NN_OPEN_CAB"
         # close_fridge: "NN_OPEN_FRIDGE"
-        # open_cab: "NN_OPEN_CAB"
-        # open_fridge: "NN_OPEN_FRIDGE"
+        open_cab: "NN_OPEN_CAB"
+        open_fridge: "NN_OPEN_FRIDGE"
         pick: "NN_PICK"
         place: "NN_PLACE"
         nav: "NN_NAV"

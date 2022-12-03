@@ -514,13 +514,11 @@ class PddlProblem(PddlDomain):
             action.set_precond(self.expand_quantifiers(action.precond))
 
     @property
-    def solution(self):
+    def solution(self) -> Optional[List[PddlAction]]:
         """
         Sequence of actions to solve the task specified in the problem file.
         """
 
-        if self._solution is None:
-            raise ValueError("Solution is not supported by this PDDL")
         return self._solution
 
     @property

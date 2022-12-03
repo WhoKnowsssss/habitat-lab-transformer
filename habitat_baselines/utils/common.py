@@ -115,11 +115,22 @@ class GaussianNet(ActionDistributionNet):
 
         self.action_activation = config.action_activation
         self.use_softplus = config.use_softplus
+        self.use_log_std = config.use_log_std
         use_std_param = config.use_std_param
         self.clamp_std = config.clamp_std
-        self.min_std = config.min_log_std
-        self.max_std = config.max_log_std
-        std_init = config.log_std_init
+        if self.use_log_std:
+            self.min_std = config.min_log_std
+            self.max_std = config.max_log_std
+            std_init = config.log_std_init
+        elif self.use_softplus:
+            inv_softplus = lambda x: math.log(math.exp(x) - 1)
+            self.min_std = inv_softplus(config.min_std)
+            self.max_std = inv_softplus(config.max_std)
+            std_init = inv_softplus(1.0)
+        else:
+            self.min_std = config.min_std
+            self.max_std = config.max_std
+            std_init = 1.0  # initialize std value so that std ~ 1
         self.scheduled_std = False
 
         if use_std_param:
@@ -173,8 +184,9 @@ class GaussianNet(ActionDistributionNet):
             mu = torch.tanh(mu)
 
         if self.clamp_std:
-            std = torch.clamp(std, min=self.min_std, max=self.max_std)
-        std = torch.exp(std)
+            std = torch.clamp(std, self.min_std, self.max_std)
+        if self.use_log_std:
+            std = torch.exp(std)
         if self.use_softplus:
             std = torch.nn.functional.softplus(std)
 

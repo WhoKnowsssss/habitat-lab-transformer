@@ -80,6 +80,7 @@ _C.TASK.BASE_ANGLE_NOISE = 0.15
 _C.TASK.BASE_NOISE = 0.05
 _C.TASK.SPAWN_REGION_SCALE = 0.2
 _C.TASK.JOINT_MAX_IMPULSE = -1.0
+_C.TASK.ENABLE_SAFE_DROP = False
 _C.TASK.DESIRED_RESTING_POSITION = [0.5, 0.0, 1.0]
 _C.TASK.USE_MARKER_T = True
 _C.TASK.SUCCESS_STATE = 0.0
@@ -667,7 +668,6 @@ _C.SIMULATOR.KINEMATIC_MODE = False
 # If in render mode a visualization of the rearrangement goal position should
 # also be displayed.
 _C.SIMULATOR.DEBUG_RENDER_GOAL = True
-_C.SIMULATOR.ROBOT_JOINT_START_NOISE = 0.0
 # Rearrange Agent Setup
 _C.SIMULATOR.CTRL_FREQ = 120.0
 _C.SIMULATOR.AC_FREQ_RATIO = 4
@@ -798,6 +798,15 @@ _C.SIMULATOR.FISHEYE_SEMANTIC_SENSOR.TYPE = "HabitatSimFisheyeSemanticSensor"
 # -----------------------------------------------------------------------------
 # AGENT
 # -----------------------------------------------------------------------------
+_C.SIMULATOR.ARM_JOINT_START = [
+    -0.45,
+    -1.08,
+    0.1,
+    0.935,
+    -0.001,
+    1.573,
+    0.005,
+]
 _C.SIMULATOR.AGENT_0 = CN()
 _C.SIMULATOR.AGENT_0.HEIGHT = 1.5
 _C.SIMULATOR.AGENT_0.RADIUS = 0.1
@@ -805,7 +814,7 @@ _C.SIMULATOR.AGENT_0.SENSORS = ["RGB_SENSOR"]
 _C.SIMULATOR.AGENT_0.IS_SET_START_STATE = False
 _C.SIMULATOR.AGENT_0.START_POSITION = [0, 0, 0]
 _C.SIMULATOR.AGENT_0.START_ROTATION = [0, 0, 0, 1]
-_C.SIMULATOR.AGENT_0.JOINT_START_NOISE = 0.0
+_C.SIMULATOR.AGENT_0.JOINT_START_NOISE = 0.1
 _C.SIMULATOR.AGENT_0.ROBOT_URDF = "data/robots/hab_fetch/robots/hab_fetch.urdf"
 _C.SIMULATOR.AGENT_0.ROBOT_TYPE = "FetchRobot"
 _C.SIMULATOR.AGENT_0.IK_ARM_URDF = (

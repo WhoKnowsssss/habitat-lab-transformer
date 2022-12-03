@@ -199,7 +199,26 @@ class RearrangeTask(NavigationTask):
         obs.update(task_obs)
         return obs
 
+    def _is_violating_safe_drop(self, action_args):
+        idxs, goal_pos = self._sim.get_targets()
+        scene_pos = self._sim.get_scene_pos()
+        target_pos = scene_pos[idxs]
+        min_dist = np.min(
+            np.linalg.norm(target_pos - goal_pos, ord=2, axis=-1)
+        )
+        return (
+            self._sim.grasp_mgr.is_grasped
+            and action_args.get("grip_action", None) is not None
+            and action_args["grip_action"] < 0
+            and min_dist < self._config.OBJ_SUCC_THRESH
+        )
+
     def step(self, action: Dict[str, Any], episode: Episode):
+        action_args = action["action_args"]
+        if self._config.ENABLE_SAFE_DROP and self._is_violating_safe_drop(
+            action_args
+        ):
+            action_args["grip_action"] = None
         obs = super().step(action=action, episode=episode)
 
         self.prev_coll_accum = copy.copy(self.coll_accum)
@@ -251,10 +270,8 @@ class RearrangeTask(NavigationTask):
             match_contacts = [
                 x
                 for x in contact_points
-                if check_id in [x.object_id_a, x.object_id_b]
-            ]
-            match_contacts = [
-                x for x in match_contacts if x.object_id_a != x.object_id_b
+                if (check_id in [x.object_id_a, x.object_id_b])
+                and (x.object_id_a != x.object_id_b)
             ]
 
             max_force = 0

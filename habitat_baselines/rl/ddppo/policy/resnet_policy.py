@@ -84,6 +84,10 @@ class PointNavResNetPolicy(NetPolicy):
             aux_loss_config=aux_loss_config,
         )
 
+    @property
+    def hidden_state_hxs_dim(self):
+        return self.net._hidden_size
+
     @classmethod
     def from_config(
         cls,
@@ -128,6 +132,7 @@ class ResNetEncoder(nn.Module):
         ngroups: int = 32,
         spatial_size: int = 128,
         make_backbone=None,
+        use_input_norm=True,
     ):
         super().__init__()
 
@@ -147,7 +152,7 @@ class ResNetEncoder(nn.Module):
             observation_space.spaces[k].shape[2] for k in self.visual_keys
         )
 
-        if False:
+        if self._n_input_channels > 0 and use_input_norm:
             self.running_mean_and_var: nn.Module = RunningMeanAndVar(
                 self._n_input_channels
             )
@@ -441,10 +446,6 @@ class PointNavResNetNet(Net):
     @property
     def num_recurrent_layers(self):
         return self.state_encoder.num_recurrent_layers
-
-    @property
-    def hidden_state_hxs_dim(self):
-        return self._hidden_size
 
     @property
     def perception_embedding_size(self):

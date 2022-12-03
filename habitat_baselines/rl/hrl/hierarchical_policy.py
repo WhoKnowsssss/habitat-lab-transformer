@@ -6,11 +6,15 @@ import gym.spaces as spaces
 import torch
 
 from habitat.core.spaces import ActionSpace
+from habitat.tasks.rearrange.multi_task.composite_sensors import (
+    CompositeSuccess,
+)
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.logging import baselines_logger
-from habitat_baselines.rl.hrl.high_level_policy import (  # noqa: F401.
-    GtHighLevelPolicy,
+from habitat_baselines.rl.hrl.hl import (  # noqa: F401.
+    FixedHighLevelPolicy,
     HighLevelPolicy,
+    StripsHighLevelPolicy,
 )
 from habitat_baselines.rl.hrl.skills import (  # noqa: F401.
     ArtObjSkillPolicy,
@@ -25,6 +29,7 @@ from habitat_baselines.rl.hrl.skills import (  # noqa: F401.
 from habitat_baselines.rl.hrl.utils import find_action_range
 from habitat_baselines.rl.ppo.policy import Policy
 from habitat_baselines.utils.common import get_num_actions
+from habitat.tasks.rearrange.multi_task.pddl_domain import PddlProblem
 
 
 @baseline_registry.register_policy
@@ -41,10 +46,24 @@ class HierarchicalPolicy(Policy):
 
         self._action_space = action_space
         self._num_envs: int = num_envs
+        self._hidden_size = full_config.RL.PPO.hidden_size
 
         # Maps (skill idx -> skill)
         self._skills: Dict[int, SkillPolicy] = {}
         self._name_to_idx: Dict[str, int] = {}
+        self._idx_to_name: Dict[int, str] = {}
+
+        task_spec_file = osp.join(
+            full_config.TASK_CONFIG.TASK.TASK_SPEC_BASE_PATH,
+            full_config.TASK_CONFIG.TASK.TASK_SPEC + ".yaml",
+        )
+        domain_file = full_config.TASK_CONFIG.TASK.PDDL_DOMAIN_DEF
+
+        self._pddl_problem = PddlProblem(
+            domain_file,
+            task_spec_file,
+            config,
+        )
 
         for i, (skill_id, use_skill_name) in enumerate(
             config.USE_SKILLS.items()
@@ -64,6 +83,7 @@ class HierarchicalPolicy(Policy):
             )
             self._skills[i] = skill_policy
             self._name_to_idx[skill_id] = i
+            self._idx_to_name[i] = skill_id
 
         self._call_high_level: torch.Tensor = torch.ones(
             self._num_envs, dtype=torch.bool
@@ -75,10 +95,7 @@ class HierarchicalPolicy(Policy):
         high_level_cls = eval(config.high_level_policy.name)
         self._high_level_policy: HighLevelPolicy = high_level_cls(
             config.high_level_policy,
-            osp.join(
-                full_config.TASK_CONFIG.TASK.TASK_SPEC_BASE_PATH,
-                full_config.TASK_CONFIG.TASK.TASK_SPEC + ".yaml",
-            ),
+            self._pddl_problem,
             num_envs,
             self._name_to_idx,
         )
@@ -86,8 +103,27 @@ class HierarchicalPolicy(Policy):
             action_space, "REARRANGE_STOP"
         )
 
+    @property
+    def hidden_state_hxs_dim(self):
+        return self._hidden_size
+
     def eval(self):
         pass
+
+    def get_policy_info(self, infos, dones):
+        policy_infos = []
+        for i, info in enumerate(infos):
+            cur_skill_idx = self._cur_skills[i].item()
+            policy_info = {"cur_skill": self._idx_to_name[cur_skill_idx]}
+
+            did_skill_fail = dones[i] and not info[CompositeSuccess.cls_uuid]
+            for skill_name, idx in self._name_to_idx.items():
+                policy_info[f"failed_skill_{skill_name}"] = (
+                    did_skill_fail if idx == cur_skill_idx else 0.0
+                )
+            policy_infos.append(policy_info)
+
+        return policy_infos
 
     @property
     def num_recurrent_layers(self):

@@ -23,6 +23,8 @@ from habitat.tasks.rearrange.rearrange_sensors import (
 
 @registry.register_sensor
 class GlobalPredicatesSensor(Sensor):
+    cls_uuid: str = "all_predicates"
+
     def __init__(self, sim, config, *args, task, **kwargs):
         self._task = task
         self._sim = sim
@@ -225,7 +227,7 @@ class CompositeSuccess(Measure):
 class CompositeStageGoals(Measure):
     """
     Adds to the metrics `[TASK_NAME]_success`: Did the agent complete a
-        particular stage defined in `stage_goals`.
+        particular stage defined in `stage_goals` at ANY point in the episode.
     """
 
     _stage_succ: List[str]

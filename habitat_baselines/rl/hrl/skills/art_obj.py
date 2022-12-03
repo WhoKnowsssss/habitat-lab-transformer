@@ -56,5 +56,4 @@ class ArtObjSkillPolicy(NnSkillPolicy):
         return is_not_holding & is_within_thresh & self._did_leave_start_zone
 
     def _parse_skill_arg(self, skill_arg):
-        self._internal_log(f"Parsing skill argument {skill_arg}")
-        return int(skill_arg[-1].split("|")[1])
+        return int(skill_arg[1].split("|")[1])
