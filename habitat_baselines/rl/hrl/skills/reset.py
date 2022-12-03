@@ -77,7 +77,7 @@ class ResetArmSkill(SkillPolicy):
         # amount was we converge to the target.
         delta = delta / np.maximum(
             self._initial_delta.max(-1, keepdims=True), 1e-5
-        )
+        )[cur_batch_idx]
 
         action = torch.zeros_like(prev_actions)
 

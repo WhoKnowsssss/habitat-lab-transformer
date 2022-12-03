@@ -172,10 +172,10 @@ class HierarchicalPolicy(Policy):
         self._high_level_policy.apply_mask(masks)
 
         should_terminate: torch.BoolTensor = torch.zeros(
-            (self._num_envs,), dtype=torch.bool
+            (self._num_envs,), dtype=torch.bool, device=masks.device
         )
         bad_should_terminate: torch.BoolTensor = torch.zeros(
-            (self._num_envs,), dtype=torch.bool
+            (self._num_envs,), dtype=torch.bool, device=masks.device
         )
 
         grouped_skills = self._broadcast_skill_ids(
@@ -203,6 +203,8 @@ class HierarchicalPolicy(Policy):
                 **dat,
                 batch_idx=batch_ids,
             )
+        should_terminate = should_terminate.cpu()
+        bad_should_terminate = bad_should_terminate.cpu()
         self._call_high_level = should_terminate
 
         # Always call high-level if the episode is over.

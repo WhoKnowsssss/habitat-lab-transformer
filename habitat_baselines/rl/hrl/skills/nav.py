@@ -43,14 +43,17 @@ class NavSkillPolicy(NnSkillPolicy):
         ret_obs = super()._get_filtered_obs(observations, cur_batch_idx)
 
         if NavGoalPointGoalSensor.cls_uuid in ret_obs:
-            for i in cur_batch_idx:
-                if self._cur_skill_args[cur_batch_idx[i]].is_target:
+            for idx, i in enumerate(cur_batch_idx):
+                if self._cur_skill_args[i].is_target:
                     replace_sensor = TargetGoalGpsCompassSensor.cls_uuid
                 else:
                     replace_sensor = TargetStartGpsCompassSensor.cls_uuid
-                ret_obs[NavGoalPointGoalSensor.cls_uuid][i] = observations[
-                    replace_sensor
-                ][i]
+                try:
+                    ret_obs[NavGoalPointGoalSensor.cls_uuid][idx] = observations[
+                        replace_sensor
+                    ][idx]
+                except:
+                    breakpoint()
         return ret_obs
 
     def _get_multi_sensor_index(self, batch_idx):

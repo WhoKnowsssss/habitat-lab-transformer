@@ -41,7 +41,15 @@ def sum_tensor_list(tensors):
 
 
 class ActionDistribution:
-    def __init__(self, action_space, box_mu_act, logits, std, boundaries, boundaries_mean):
+    def __init__(
+        self,
+        action_space,
+        box_mu_act,
+        logits,
+        std,
+        boundaries,
+        boundaries_mean,
+    ):
         if std is None:
             self.params = logits
         else:
@@ -124,14 +132,14 @@ class ActionDistribution:
 
     def mean(self):
         return torch.cat(
-                [
-                    dist.mode().to(self.dtype)
-                    if isinstance(dist, CustomFixedCategorical)
-                    else dist.mean
-                    for dist in self.distributions
-                ],
-                -1,
-            )
+            [
+                dist.mode().to(self.dtype)
+                if isinstance(dist, CustomFixedCategorical)
+                else dist.mean
+                for dist in self.distributions
+            ],
+            -1,
+        )
         # return self.unnormalize_actions(
         #     torch.cat(
         #         [
@@ -180,11 +188,11 @@ class ActionDistribution:
             + 3 * (action[:, 7] == 2).int()
             - 2
         )
-        mask = action[:,7:8] == -1
+        mask = action[:, 7:8] == -1
         return torch.cat([action, torch.zeros_like(mask.float())], dim=-1)
 
     def normalize_actions(self, action):
-        action = torch.clone(action[:,:10])
+        action = torch.clone(action[:, :10])
         action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
         action[:, 7] = (
             (action[:, 7] == 0).int()
@@ -267,14 +275,15 @@ class MixedDistributionNet(ActionDistributionNet):
             nn.init.constant_(self.std_head.bias[:], std_init)
 
         ###HACK
+
         if False:
             for param in self.parameters():
                 param.requires_grad = False
-            self.residual_action_net= GaussianNet(
-                    num_inputs,
-                    n_actions,
-                    config,
-                )
+            self.residual_action_net = GaussianNet(
+                num_inputs,
+                n_actions,
+                config,
+            )
 
     def update(self, training_progress: float):
         if not self.scheduled_std:
@@ -306,35 +315,49 @@ class MixedDistributionNet(ActionDistributionNet):
         if self.use_softplus:
             std = torch.nn.functional.softplus(std)
 
-        logits[:,:77] = logits[:,:77] / self.temperature
+        logits[:, :77] = logits[:, :77] / self.temperature
 
-        if not hasattr(self, 'residual_action_net'):
+        if not hasattr(self, "residual_action_net"):
             return ActionDistribution(
-                self.action_space, self.action_activation, logits, std, self.boundaries, self.boundaries_mean
+                self.action_space,
+                self.action_activation,
+                logits,
+                std,
+                self.boundaries,
+                self.boundaries_mean,
             )
         else:
             return Residual_Action_Distribution(
                 ActionDistribution(
-                    self.action_space, self.action_activation, logits, std, self.boundaries, self.boundaries_mean
-                ), 
-                self.residual_action_net(x)
+                    self.action_space,
+                    self.action_activation,
+                    logits,
+                    std,
+                    self.boundaries,
+                    self.boundaries_mean,
+                ),
+                self.residual_action_net(x),
             )
+
 
 class Residual_Action_Distribution:
     def __init__(self, main, residual) -> None:
         self.main = main
         self.residual = residual
+
     def sample(self, sample_shape=None):
         return self.main.mean() + self.residual.sample()
+
     def mean(self):
         return self.main.mean() + self.residual.mean
+
     def log_probs(self, actions):
         return self.residual.log_probs(actions - self.main.mean())
+
     def entropy(self):
         return self.residual.entropy()
 
 
-        
 def linear_decay(epoch: int, total_num_updates: int) -> float:
     r"""Returns a multiplicative factor for linear value decay
 

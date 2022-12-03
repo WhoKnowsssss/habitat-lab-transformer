@@ -95,25 +95,25 @@ class SkillPolicy(Policy):
                 f"Requested skill termination {is_skill_done}",
                 observations,
             )
-
         bad_terminate = torch.zeros(
-            self._cur_skill_step.shape,
+            (len(batch_idx), ),
             device=self._cur_skill_step.device,
             dtype=torch.bool,
         )
         if self._config.MAX_SKILL_STEPS > 0:
             over_max_len = self._cur_skill_step > self._config.MAX_SKILL_STEPS
             if self._config.FORCE_END_ON_TIMEOUT:
-                bad_terminate = over_max_len
+                bad_terminate = over_max_len[batch_idx]
             else:
-                is_skill_done = is_skill_done | over_max_len
+                is_skill_done = is_skill_done | over_max_len[batch_idx]
 
         if bad_terminate.sum() > 0:
             self._internal_log(
                 f"Bad terminating due to timeout {self._cur_skill_step}, {bad_terminate}",
                 observations,
             )
-
+        if is_skill_done.shape != bad_terminate.shape:
+            breakpoint()
         return is_skill_done, bad_terminate
 
     def on_enter(
