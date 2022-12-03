@@ -23,6 +23,8 @@ from habitat.tasks.rearrange.rearrange_sensors import (
 
 @registry.register_sensor
 class GlobalPredicatesSensor(Sensor):
+    cls_uuid: str = "all_predicates"
+
     def __init__(self, sim, config, *args, task, **kwargs):
         self._task = task
         self._sim = sim

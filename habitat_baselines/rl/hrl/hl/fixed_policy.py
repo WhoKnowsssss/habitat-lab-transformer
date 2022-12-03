@@ -15,27 +15,27 @@ class FixedHighLevelPolicy:
 
     _solution_actions: List[Tuple[str, List[str]]]
 
-    def __init__(self, config, task_spec_file, num_envs, skill_name_to_idx):
-        with open(task_spec_file, "r") as f:
-            task_spec = yaml.safe_load(f)
-
-        self._solution_actions = []
-        if "solution" not in task_spec:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        sol_actions = self._pddl_problem.solution
+        if sol_actions is None:
             raise ValueError(
-                f"The ground truth task planner only works when the task solution is hard-coded in the PDDL problem file at {task_spec_file}"
+                f"The ground truth task planner only works when the task solution is hard-coded in the PDDL problem file."
             )
-        for i, sol_step in enumerate(task_spec["solution"]):
-            sol_action = parse_func(sol_step)
+        self._solution_actions = []
+        for i, sol_step in enumerate(sol_actions):
+            sol_action = [
+                sol_step.name,
+                [x.name for x in sol_step.param_values],
+            ]
             self._solution_actions.append(sol_action)
-            if config.add_arm_rest and i < (len(task_spec["solution"]) - 1):
+            if self._config.add_arm_rest and i < (len(sol_actions) - 1):
                 self._solution_actions.append(parse_func("reset_arm(0)"))
 
         # Add a wait action at the end.
         self._solution_actions.append(parse_func("wait(30)"))
 
-        self._next_sol_idxs = torch.zeros(num_envs, dtype=torch.int32)
-        self._num_envs = num_envs
-        self._skill_name_to_idx = skill_name_to_idx
+        self._next_sol_idxs = torch.zeros(self._num_envs, dtype=torch.int32)
 
     def apply_mask(self, mask):
         self._next_sol_idxs *= mask.cpu().view(-1)

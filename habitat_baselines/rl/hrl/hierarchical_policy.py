@@ -14,6 +14,7 @@ from habitat_baselines.common.logging import baselines_logger
 from habitat_baselines.rl.hrl.hl import (  # noqa: F401.
     FixedHighLevelPolicy,
     HighLevelPolicy,
+    StripsHighLevelPolicy,
 )
 from habitat_baselines.rl.hrl.skills import (  # noqa: F401.
     ArtObjSkillPolicy,
@@ -28,6 +29,7 @@ from habitat_baselines.rl.hrl.skills import (  # noqa: F401.
 from habitat_baselines.rl.hrl.utils import find_action_range
 from habitat_baselines.rl.ppo.policy import Policy
 from habitat_baselines.utils.common import get_num_actions
+from habitat.tasks.rearrange.multi_task.pddl_domain import PddlProblem
 
 
 @baseline_registry.register_policy
@@ -50,6 +52,18 @@ class HierarchicalPolicy(Policy):
         self._skills: Dict[int, SkillPolicy] = {}
         self._name_to_idx: Dict[str, int] = {}
         self._idx_to_name: Dict[int, str] = {}
+
+        task_spec_file = osp.join(
+            full_config.TASK_CONFIG.TASK.TASK_SPEC_BASE_PATH,
+            full_config.TASK_CONFIG.TASK.TASK_SPEC + ".yaml",
+        )
+        domain_file = full_config.TASK_CONFIG.TASK.PDDL_DOMAIN_DEF
+
+        self._pddl_problem = PddlProblem(
+            domain_file,
+            task_spec_file,
+            config,
+        )
 
         for i, (skill_id, use_skill_name) in enumerate(
             config.USE_SKILLS.items()
@@ -81,10 +95,7 @@ class HierarchicalPolicy(Policy):
         high_level_cls = eval(config.high_level_policy.name)
         self._high_level_policy: HighLevelPolicy = high_level_cls(
             config.high_level_policy,
-            osp.join(
-                full_config.TASK_CONFIG.TASK.TASK_SPEC_BASE_PATH,
-                full_config.TASK_CONFIG.TASK.TASK_SPEC + ".yaml",
-            ),
+            self._pddl_problem,
             num_envs,
             self._name_to_idx,
         )
