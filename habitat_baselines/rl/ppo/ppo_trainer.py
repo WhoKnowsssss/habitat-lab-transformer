@@ -1100,6 +1100,7 @@ class PPOTrainer(BaseRLTrainer):
             visual_batch = get_save_obs(batch)
             for i in range(self.envs.num_envs):
                 buffer_obs[i].append(visual_batch[i])
+
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
             and self.envs.num_envs > 0

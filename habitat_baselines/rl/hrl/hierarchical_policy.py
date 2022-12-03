@@ -269,7 +269,6 @@ class HierarchicalPolicy(Policy):
                 masks=batch_dat["masks"],
                 cur_batch_idx=batch_ids,
             )
-
             # LL skills are not allowed to terminate the overall episode.
             actions[batch_ids] = tmp_actions
             rnn_hidden_states[batch_ids] = tmp_rnn

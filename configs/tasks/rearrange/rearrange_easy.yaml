@@ -14,7 +14,7 @@ ENVIRONMENT:
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/{split}/rearrange_easy.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_easy.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangeCompositeTask-v0
@@ -47,8 +47,9 @@ TASK:
     - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
-        MAX_ACCUM_FORCE: 100_000.0
-        MAX_INSTANT_FORCE: 10_000.0
+        # MAX_ACCUM_FORCE: 100_000.0
+        # MAX_INSTANT_FORCE: 10_000.0
+        MAX_ACCUM_FORCE: -1.0
     COMPOSITE_SUCCESS:
         MUST_CALL_STOP: False
     MEASUREMENTS:

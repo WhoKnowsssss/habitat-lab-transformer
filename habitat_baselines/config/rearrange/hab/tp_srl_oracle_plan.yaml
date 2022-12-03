@@ -3,9 +3,10 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-VIDEO_OPTION: ["disk"]
+# VIDEO_OPTION: ["disk"]
+VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir"
+VIDEO_DIR: "video_dir/full_ref"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -50,6 +51,11 @@ TASK_CONFIG:
       - is_holding
       - ee_pos
       - all_predicates
+
+DATASET_SAVE_PATH: "/srv/share/aszot3/share_demos/nav_pick_03_09/"
+DATASET_SAVE_INTERVAL: 2
+DATASET_SAVE_ENCODER: True
+DATASET_SAVE_VISUAL_ENCODED: False
 
 
 RL:

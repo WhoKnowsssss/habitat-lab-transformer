@@ -112,8 +112,7 @@ class SkillPolicy(Policy):
                 f"Bad terminating due to timeout {self._cur_skill_step}, {bad_terminate}",
                 observations,
             )
-        if is_skill_done.shape != bad_terminate.shape:
-            breakpoint()
+
         return is_skill_done, bad_terminate
 
     def on_enter(

@@ -131,12 +131,9 @@ class NnSkillPolicy(SkillPolicy):
         )
         full_action = torch.zeros(prev_actions.shape, device=masks.device)
         full_action[:, self._ac_start : self._ac_start + self._ac_len] = action
-        try:
-            self._did_want_done[cur_batch_idx] = full_action[
-                :, self._stop_action_idx
-            ]
-        except:
-            breakpoint()
+        self._did_want_done[cur_batch_idx] = full_action[
+            :, self._stop_action_idx
+        ]
         return full_action, rnn_hidden_states
 
     @classmethod
