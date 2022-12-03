@@ -1095,12 +1095,13 @@ class PPOTrainer(BaseRLTrainer):
             buffer_masks = defaultdict(list)
             buffer_actions = defaultdict(list)
             buffer_infos = defaultdict(list)
-            saved_num_episodes = 0
+            saved_num_episodes = self.config.DATASET_SAVE_START
 
             visual_batch = get_save_obs(batch)
             for i in range(self.envs.num_envs):
                 buffer_obs[i].append(visual_batch[i])
 
+        success_counter_temp = []
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
             and self.envs.num_envs > 0
@@ -1118,7 +1119,7 @@ class PPOTrainer(BaseRLTrainer):
                     test_recurrent_hidden_states,
                     prev_actions,
                     not_done_masks,
-                    # deterministic=True,
+                    deterministic=True,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore
@@ -1139,7 +1140,6 @@ class PPOTrainer(BaseRLTrainer):
                 step_data = [a.item() for a in actions.cpu()]
 
             outputs = self.envs.step(step_data)
-
             observations, rewards_l, dones, infos = [
                 list(x) for x in zip(*outputs)
             ]
@@ -1176,7 +1176,11 @@ class PPOTrainer(BaseRLTrainer):
                     buffer_masks[i].append(not_done_masks[i])
                     buffer_actions[i].append(actions[i])
                     buffer_infos[i].append(
-                        {"episode": next_episodes_info[i].episode_id, "success": False}
+                        {
+                            "episode": next_episodes_info[i].episode_id,
+                            "success": False,
+                            "skill": policy_info[i]["cur_skill"],
+                        }
                     )
                 if (
                     ep_eval_count[
@@ -1218,6 +1222,14 @@ class PPOTrainer(BaseRLTrainer):
                             buffer_infos[i][idx]["success"] = infos[i][
                                 "composite_success"
                             ]
+                            if "open" in buffer_infos[i][idx]["skill"]:
+                                full=True
+                            else:
+                                full=False
+                        if full:
+                            success_counter_temp.append(
+                                infos[i]["composite_success"]
+                            )
                         all_rewards.extend(buffer_rewards[i])
                         all_masks.extend(buffer_masks[i])
                         all_actions.extend(buffer_actions[i])
@@ -1231,7 +1243,8 @@ class PPOTrainer(BaseRLTrainer):
                         buffer_infos[i] = []
 
                         if (
-                            saved_num_episodes % self.config.DATASET_SAVE_INTERVAL
+                            saved_num_episodes
+                            % self.config.DATASET_SAVE_INTERVAL
                             == 0
                         ):
                             flush_episodes()
@@ -1280,7 +1293,14 @@ class PPOTrainer(BaseRLTrainer):
                             / num_episodes
                         )
 
-                    print('\n\nSuccess Rate: ', aggregated_stats['composite_success'])
+                    print(
+                        "\n\nSuccess Rate: ",
+                        aggregated_stats["composite_success"],
+                    )
+                    print(
+                        "Rearrange success: ", 
+                        sum(success_counter_temp)/len(success_counter_temp) if len(success_counter_temp) > 0 else 0
+                    )
 
                     gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     if gfx_str != "":

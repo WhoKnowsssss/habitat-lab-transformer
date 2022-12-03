@@ -3,8 +3,8 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-VIDEO_OPTION: ["disk"]
-# VIDEO_OPTION: []
+# VIDEO_OPTION: ["disk"]
+VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/easy_ref"
 VIDEO_FPS: 30
@@ -30,6 +30,7 @@ EVAL:
 
 DATASET_SAVE_PATH: "/srv/share/aszot3/share_demos/nav_pick_03_09/"
 DATASET_SAVE_INTERVAL: 2
+DATASET_SAVE_START: 0
 DATASET_SAVE_ENCODER: True
 DATASET_SAVE_VISUAL_ENCODED: False
 
