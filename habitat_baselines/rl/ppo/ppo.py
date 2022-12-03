@@ -201,7 +201,7 @@ class PPO(nn.Module):
             for p in pg["params"]:
                 p.grad = None
 
-    def update(self, rollouts: RolloutStorage, num_) -> Dict[str, float]:
+    def update(self, rollouts: RolloutStorage, num_, value_func_iter) -> Dict[str, float]:
 
         advantages = self.get_advantages(rollouts)
 

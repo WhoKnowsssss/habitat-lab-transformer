@@ -123,8 +123,7 @@ class ActionDistribution:
         return action
 
     def mean(self):
-        return self.unnormalize_actions(
-            torch.cat(
+        return torch.cat(
                 [
                     dist.mode().to(self.dtype)
                     if isinstance(dist, CustomFixedCategorical)
@@ -133,7 +132,17 @@ class ActionDistribution:
                 ],
                 -1,
             )
-        )
+        # return self.unnormalize_actions(
+        #     torch.cat(
+        #         [
+        #             dist.mode().to(self.dtype)
+        #             if isinstance(dist, CustomFixedCategorical)
+        #             else dist.mean
+        #             for dist in self.distributions
+        #         ],
+        #         -1,
+        #     )
+        # )
 
     def log_probs(self, action):
         # action = self.normalize_actions(action)
@@ -202,6 +211,7 @@ class MixedDistributionNet(ActionDistributionNet):
         self.min_std = config.min_log_std
         self.max_std = config.max_log_std
         std_init = config.log_std_init
+        self.temperature = config.temperature
         self.scheduled_std = False
 
         n_actions = get_num_actions(action_space)
@@ -295,6 +305,8 @@ class MixedDistributionNet(ActionDistributionNet):
         std = torch.exp(std)
         if self.use_softplus:
             std = torch.nn.functional.softplus(std)
+
+        logits[:,:77] = logits[:,:77] / self.temperature
 
         if not hasattr(self, 'residual_action_net'):
             return ActionDistribution(
