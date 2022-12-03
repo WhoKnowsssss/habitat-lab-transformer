@@ -5,9 +5,10 @@ import yaml
 
 from habitat.tasks.rearrange.multi_task.rearrange_pddl import parse_func
 from habitat_baselines.common.logging import baselines_logger
+from habitat_baselines.rl.hrl.hl.high_level_policy import HighLevelPolicy
 
 
-class FixedHighLevelPolicy:
+class FixedHighLevelPolicy(HighLevelPolicy):
     """
     :property _solution_actions: List of tuples were first tuple element is the
         action name and the second is the action arguments.
