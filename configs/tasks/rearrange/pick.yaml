@@ -80,7 +80,7 @@ TASK:
 
     PICK_SUCCESS:
         TYPE: "RearrangePickSuccess"
-        EE_RESTING_SUCCESS_THRESHOLD: 0.2
+        EE_RESTING_SUCCESS_THRESHOLD: 2.0
 
     MEASUREMENTS:
         - "ROBOT_FORCE"
@@ -95,7 +95,7 @@ TASK:
     ACTIONS:
         ARM_ACTION:
             TYPE: ArmAction
-            ARM_CONTROLLER: ArmAbsPosAction
+            ARM_CONTROLLER: ArmRelPosAction
             GRIP_CONTROLLER: SuctionGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
             GRASP_THRESH_DIST: 0.15
@@ -155,7 +155,7 @@ SIMULATOR:
         WIDTH: 128
 
     HABITAT_SIM_V0:
-        ALLOW_SLIDING: False
+        ALLOW_SLIDING: True
         ENABLE_PHYSICS: True
         GPU_DEVICE_ID: 0
         GPU_GPU: False

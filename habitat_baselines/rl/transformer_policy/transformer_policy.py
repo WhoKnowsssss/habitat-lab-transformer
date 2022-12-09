@@ -287,6 +287,16 @@ class TransformerResNetPolicy(NetPolicy):
 
         if self.train_planner:
             B = actions.shape[0]
+            
+            aux_logits = planner_logits[1]
+            planner_logits = planner_logits[0]
+
+            temp_target = torch.cat([states["obj_start_gps_compass"].reshape(B, -1, 2), 
+            states["obj_goal_gps_compass"].reshape(B, -1, 2), ], dim=-1)
+            
+            loss_aux = F.mse_loss(aux_logits, temp_target)
+            loss = loss + loss_aux
+            
             temp_target = states["skill"].reshape(B, -1, 1)
 
             # ========================== planner action ============================
@@ -299,10 +309,12 @@ class TransformerResNetPolicy(NetPolicy):
                 torch.argmax(planner_logits[:, :, :], dim=-1)
                 == temp_target.reshape(B, -1).long()
             ) / np.prod(temp_target.shape)
+
             loss_dict.update(
                 {
                     "planner_skill": loss_p.detach().item(),
                     "accuracy_planner_skill": accuracy_p.detach().item(),
+                    "aux_loss": loss_aux.detach().item(),
                 }
             )
             loss = loss + loss_p
@@ -413,7 +425,7 @@ class TransformerResNetPolicy(NetPolicy):
             loss1 = torch.exp(-self.loss_vars[0]) * loss1 + self.loss_vars[0]
             loss2 = torch.exp(-self.loss_vars[1]) * loss2 + self.loss_vars[1]
             loss3 = torch.exp(-self.loss_vars[2]) * loss3 + self.loss_vars[2]
-            # loss4 = torch.exp(-self.loss_vars[2]) * loss4 + self.loss_vars[2]
+            # loss = torch.exp(-self.loss_vars[3]) * loss + self.loss_vars[3]
             loss = loss + loss1 + loss2 + loss3  # + loss4
         return loss, loss_dict
 
@@ -709,20 +721,20 @@ class TransformerResnetNet(nn.Module):
         out = self.planner_encoder(
             rnn_hidden_states[..., :-obs_dim],
         )
-        # rnn_hidden_states[
-        #     torch.arange(B), current_context, -obs_dim
-        # ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
-        # self.cur_skill = torch.argmax(out[torch.arange(B), current_context], dim=-1)
+        rnn_hidden_states[
+            torch.arange(B), current_context, -obs_dim
+        ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
+        self.cur_skill = torch.argmax(out[torch.arange(B), current_context], dim=-1)
 
         # rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
         # ] = observations["is_holding"].reshape(B)
         # self.cur_skill = observations["is_holding"].reshape(B)
 
-        rnn_hidden_states[
-            torch.arange(B), current_context, -obs_dim
-        ] = torch.ones(B).cuda()
-        self.cur_skill = observations["is_holding"].reshape(B)
+        # rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = torch.ones(B).cuda() * 1
+        # self.cur_skill = torch.ones(B).cuda() * 1
 
 
         rnn_hidden_states = rnn_hidden_states.contiguous()

@@ -361,11 +361,11 @@ class TransformerTrainer(BaseRLTrainer):
 
         if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 10:
             fn = os.listdir(self.config.CHECKPOINT_FOLDER)
-            fn.sort()
+            fn = [int(f.split('.')[1]) if f != '.habitat-resume-state.pth' else -1 for f in fn]
             os.remove(
                 os.path.join(
                     self.config.CHECKPOINT_FOLDER,
-                    fn[0],
+                    "ckpt.{}.pth".format(fn[1]),
                 )
             )
 
@@ -595,21 +595,21 @@ class TransformerTrainer(BaseRLTrainer):
             lr_scheduler_after.load_state_dict(resume_state["lr_sched_state"])
             lr_scheduler.total_epoch = 0
 
-        requeue_stats = resume_state["requeue_stats"]
-        # self.env_time = requeue_stats["env_time"]
-        # self.pth_time = requeue_stats["pth_time"]
-        # self.num_steps_done = requeue_stats["num_steps_done"]
-        self.num_updates_done = requeue_stats["num_updates_done"]
-        # self._last_checkpoint_percent = requeue_stats[
-        #     "_last_checkpoint_percent"
-        # ]
-        # count_checkpoints = requeue_stats["count_checkpoints"]
-        # prev_time = requeue_stats["prev_time"]
+            requeue_stats = resume_state["requeue_stats"]
+            # self.env_time = requeue_stats["env_time"]
+            # self.pth_time = requeue_stats["pth_time"]
+            # self.num_steps_done = requeue_stats["num_steps_done"]
+            self.num_updates_done = requeue_stats["num_updates_done"]
+            # self._last_checkpoint_percent = requeue_stats[
+            #     "_last_checkpoint_percent"
+            # ]
+            # count_checkpoints = requeue_stats["count_checkpoints"]
+            # prev_time = requeue_stats["prev_time"]
 
-        # self.running_episode_stats = requeue_stats["running_episode_stats"]
-        # self.window_episode_stats.update(
-        #     requeue_stats["window_episode_stats"]
-        # )
+            # self.running_episode_stats = requeue_stats["running_episode_stats"]
+            # self.window_episode_stats.update(
+            #     requeue_stats["window_episode_stats"]
+            # )
 
         with (
             get_writer(self.config, flush_secs=self.flush_secs)

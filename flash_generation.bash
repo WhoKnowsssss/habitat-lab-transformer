@@ -12,4 +12,4 @@ else
     f=rearrange
 fi
 
-srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/$c --run-type eval WRITER_TYPE tb TEST_EPISODE_COUNT ${4:-1000} DATASET_SAVE_PATH /srv/flash1/xhuang394/share_demos/$f DATASET_SAVE_START ${2:-0} TASK_CONFIG.SEED ${3:-42} TASK_CONFIG.SIMULATOR.SEED ${3:-42}
+srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/$c --run-type eval WRITER_TYPE tb TEST_EPISODE_COUNT ${4:-9000} DATASET_SAVE_PATH /srv/flash1/xhuang394/share_demos/$f DATASET_SAVE_START ${2:-0} TASK_CONFIG.SEED ${3:-42} TASK_CONFIG.SIMULATOR.SEED ${3:-42}

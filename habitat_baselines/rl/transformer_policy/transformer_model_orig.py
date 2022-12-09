@@ -496,6 +496,8 @@ class PlannerGPT(nn.Module):
                 ]
             )
         self.output_head = nn.Linear(config.n_embd, config.num_skills)
+        self.output_head2 = nn.Linear(config.n_embd, 4)
+        self.output_head2.requires_grad_(False)
 
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -539,4 +541,4 @@ class PlannerGPT(nn.Module):
         x = self.blocks(x)
         x = self.ln_f(x)
 
-        return self.output_head(x)
+        return self.output_head(x)#, self.output_head2(x)

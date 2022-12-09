@@ -57,7 +57,7 @@ RL:
   TRAJECTORY_DATASET:
     # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange"
     trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
-    files_per_load: 1
+    files_per_load: 2
     queue_size: 1
 
 

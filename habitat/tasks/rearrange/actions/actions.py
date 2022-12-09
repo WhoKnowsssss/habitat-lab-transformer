@@ -211,8 +211,8 @@ class ArmAbsPosKinematicAction(RobotAction):
     def action_space(self):
         return spaces.Box(
             shape=(self._config.ARM_JOINT_DIMENSIONALITY,),
-            low=0,
-            high=1,
+            low=-2,
+            high=2,
             dtype=np.float32,
         )
 

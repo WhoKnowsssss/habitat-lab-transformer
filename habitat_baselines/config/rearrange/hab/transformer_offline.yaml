@@ -1,5 +1,5 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/pick.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
 TRAINER_NAME: "transformer"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
@@ -13,11 +13,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/npnp_25k_seq_offline"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_rel_arm_aux"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/npnp_25k_seq_offline"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_rel_arm_full"
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 1.0e8
 LOG_INTERVAL: 1
@@ -120,5 +120,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "only_planner"
+  RUN_NAME: "rearrange_rel_arm_full"
   GROUP: "trfm_variable_test"
