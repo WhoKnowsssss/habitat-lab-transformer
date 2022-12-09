@@ -315,7 +315,7 @@ class MixedDistributionNet(ActionDistributionNet):
         if self.use_softplus:
             std = torch.nn.functional.softplus(std)
 
-        logits[:, :77] = logits[:, :77] / self.temperature
+        logits[:, :self.num_discrete_logits] = logits[:, :self.num_discrete_logits] / self.temperature
 
         if not hasattr(self, "residual_action_net"):
             return ActionDistribution(

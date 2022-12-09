@@ -4,5 +4,19 @@ set -x
 source ~/.bashrc
 conda activate /srv/cvmlp-lab/flash1/xhuang394/conda/hab_new
 export TMPDIR=~/tmp/
-wandb online
-srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/transformer_offline.yaml --run-type train
+if [ $1 == "easy" ];
+	then
+	CONFIG="transformer_easy_offline.yaml"
+else
+	CONFIG="transformer_offline.yaml"
+fi
+
+if [ $2 == "eval" ];
+	then
+	MODE="eval"
+	wandb offline
+else
+	MODE="train"
+	wandb online
+fi
+srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/$CONFIG --run-type $MODE

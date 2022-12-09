@@ -389,11 +389,10 @@ class GPT(nn.Module):
             ] = action_embeddings
 
         elif actions is not None and self.model_type == "bc":
-            # temp_a = actions[:, :, :7].contiguous()
             actions = torch.clone(actions)
-            actions[:, :, :7] = (
-                torch.bucketize(actions[:, :, :7], self.boundaries) - 1
-            ) / 10
+            # actions[:, :, :7] = (
+            #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
+            # ) / 10 * 2 - 1
             actions[:,:,[10]] = 0
             actions = actions.type(torch.float32)
             action_embeddings = self.action_embeddings(
@@ -421,24 +420,6 @@ class GPT(nn.Module):
                 raise NotImplementedError
         else:
             raise NotImplementedError
-            # token_embeddings = torch.zeros(
-            #     (
-            #         states.shape[0],
-            #         (self.num_inputs - 1) * states.shape[1],
-            #         self.config.n_embd,
-            #     ),
-            #     dtype=torch.float32,
-            #     device=action_embeddings.device,
-            # )
-
-            # token_embeddings[:,::(self.num_inputs-1),:] = state_inputs[0]
-            # token_embeddings[:, :: (self.num_inputs - 1), :] = torch.cat(
-            #     [state_inputs[0], state_inputs[-1]], dim=-1
-            # )
-
-            # token_embeddings[
-            #     :, (self.num_inputs - 2) :: (self.num_inputs - 1), :
-            # ] = action_embeddings
 
         batch_size = states.shape[0]
         # all_global_pos_emb = torch.repeat_interleave(
@@ -473,6 +454,8 @@ class PlannerGPT(nn.Module):
         self.config = config
 
         self.model_type = config.model_type
+
+        self.num_inputs = 1
 
         config.block_size = config.block_size * self.num_inputs
 
@@ -523,7 +506,7 @@ class PlannerGPT(nn.Module):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    def forward():
+    def forward(self, states):
 
         state_inputs = list(
             torch.split(
@@ -543,15 +526,13 @@ class PlannerGPT(nn.Module):
                 self.config.n_embd,
             ),
             dtype=torch.float32,
-            device=action_embeddings.device,
+            device=states.device,
         )
 
-        token_embeddings[:,1::self.num_inputs,:] = torch.cat(
+        token_embeddings[:,::self.num_inputs,:] = torch.cat(
             [state_inputs[0], state_inputs[-1]], dim=-1
         )
-        
-        batch_size = states.shape[0]
-
+    
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
 
         x = self.drop(token_embeddings + position_embeddings)

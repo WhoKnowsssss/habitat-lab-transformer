@@ -1,11 +1,11 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/pick.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
 TRAINER_NAME: "transformer"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/npnp_25k_train"
+VIDEO_DIR: "video_dir/rearrange_easy_test"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -13,11 +13,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/npnp_25k_seq_offline"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_easy_test"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/npnp_25k_seq_offline"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_easy_test"
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 1.0e8
 LOG_INTERVAL: 1
@@ -37,14 +37,14 @@ RL:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
       ACTION_DIST:
-        discrete_arm: false
-        discrete_base: false
+        discrete_arm: true
+        discrete_base: true
         use_std_param: true
         temperature: 1.0
       use_rgb: false
       offline: true
       include_visual_keys: ["robot_head_depth"] # "robot_head_depth", robot_head_rgb
-      train_planner: true
+      train_planner: false
       train_control: true
       temperature: 1.0
       
@@ -55,10 +55,10 @@ RL:
   SLACK_REWARD: -0.01
 
   TRAJECTORY_DATASET:
-    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange"
-    # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
-    files_per_load: 5
-    queue_size: 10
+    # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange"
+    trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
+    files_per_load: 1
+    queue_size: 1
 
 
     steps_to_reload: 5000
@@ -70,7 +70,7 @@ RL:
     eps: 1.0E-5
     grad_norm_clip: 0.5
     use_linear_lr_decay: True
-    batch_size: 230
+    batch_size: 50
     num_workers: 2
 
 
@@ -121,4 +121,4 @@ WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
   RUN_NAME: "only_planner"
-  GROUP: "trfm_variable_test"
+  GROUP: "trfm_easy_test"

@@ -14,7 +14,7 @@ ENVIRONMENT:
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/{split}/rearrange_easy.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_easy.json.gz
     SCENES_DIR: "data/replica_cad/"
 TASK:
     TYPE: RearrangePickTask-v0
@@ -56,9 +56,9 @@ TASK:
     - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
-        # MAX_ACCUM_FORCE: -1.0 
-        MAX_ACCUM_FORCE: 10_000.0
-        MAX_INSTANT_FORCE: 10_000.0
+        MAX_ACCUM_FORCE: -1.0 
+        # MAX_ACCUM_FORCE: 10_000.0
+        # MAX_INSTANT_FORCE: 10_000.0
     PICK_REWARD:
         TYPE: "RearrangePickReward"
         DIST_REWARD: 2.0
@@ -95,8 +95,8 @@ TASK:
     ACTIONS:
         ARM_ACTION:
             TYPE: ArmAction
-            ARM_CONTROLLER: ArmRelPosAction
-            GRIP_CONTROLLER: MagicGraspAction
+            ARM_CONTROLLER: ArmAbsPosAction
+            GRIP_CONTROLLER: SuctionGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
             GRASP_THRESH_DIST: 0.15
             DISABLE_GRIP: false
@@ -128,6 +128,7 @@ SIMULATOR:
     CONCUR_RENDER: True
     AUTO_SLEEP: True
     AGENT_0:
+        JOINT_START_NOISE: 0.00
         HEIGHT: 1.5
         RADIUS: 0.3
         SENSORS: ['HEAD_DEPTH_SENSOR']
@@ -135,8 +136,8 @@ SIMULATOR:
         ROBOT_TYPE: FetchSuctionRobot
         IK_ARM_URDF: ./data/robots/hab_fetch/robots/fetch_onlyarm.urdf
     HEAD_DEPTH_SENSOR:
-        WIDTH: 128
-        HEIGHT: 128
+        WIDTH: 256
+        HEIGHT: 256
         MIN_DEPTH: 0.0
         MAX_DEPTH: 10.0
         NORMALIZE_DEPTH: True
@@ -154,10 +155,10 @@ SIMULATOR:
         WIDTH: 128
 
     HABITAT_SIM_V0:
-        ALLOW_SLIDING: True
+        ALLOW_SLIDING: False
         ENABLE_PHYSICS: True
         GPU_DEVICE_ID: 0
         GPU_GPU: False
         PHYSICS_CONFIG_FILE: ./data/default.physics_config.json
-    SEED: 98
+    SEED: 100
     TYPE: RearrangeSim-v0

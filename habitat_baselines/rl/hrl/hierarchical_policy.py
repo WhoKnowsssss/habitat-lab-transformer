@@ -196,13 +196,16 @@ class HierarchicalPolicy(Policy):
                 # Policy has not prediced a skill yet.
                 should_terminate[batch_ids] = 1.0
                 continue
-            (
-                should_terminate[batch_ids],
-                bad_should_terminate[batch_ids],
-            ) = self._skills[skill_id].should_terminate(
-                **dat,
-                batch_idx=batch_ids,
-            )
+            try:
+                (
+                    should_terminate[batch_ids],
+                    bad_should_terminate[batch_ids],
+                ) = self._skills[skill_id].should_terminate(
+                    **dat,
+                    batch_idx=batch_ids,
+                )
+            except:
+                breakpoint()
         should_terminate = should_terminate.cpu()
         bad_should_terminate = bad_should_terminate.cpu()
         self._call_high_level = should_terminate

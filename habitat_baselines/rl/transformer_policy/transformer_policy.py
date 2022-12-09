@@ -29,12 +29,13 @@ from habitat_baselines.rl.ppo.policy import Policy
 from habitat_baselines.rl.transformer_policy.transformer_model_orig import (
     GPTConfig,
     GPT,
+    PlannerGPT,
 )
 
 # from habitat_baselines.rl.models.rnn_state_encoder import (
 #     build_rnn_state_encoder,
 # )
-from habitat_baselines.transformer.pure_bc_model import LSTMBC
+from habitat_baselines.rl.transformer_policy.pure_bc_model import LSTMBC
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.utils.common import get_num_actions
 from habitat_baselines.rl.transformer_policy.action_distribution import (
@@ -70,6 +71,8 @@ class TransformerResNetPolicy(NetPolicy):
     ):
         include_visual_keys = policy_config.include_visual_keys
         self.offline_training = policy_config.offline
+        self.train_planner = policy_config.train_planner
+        self.train_control = policy_config.train_control
         super().__init__(
             TransformerResnetNet(
                 observation_space=observation_space,
@@ -128,12 +131,18 @@ class TransformerResNetPolicy(NetPolicy):
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
 
+        self.action_config = policy_config.ACTION_DIST
+
         if self.action_distribution_type == "categorical":
             self.len_logit = [11 * 7, 3, 11 * 2]
         elif self.action_distribution_type == "gaussian":
             self.len_logit = [7, 1, 2]
         elif self.action_distribution_type == "mixed":
-            self.len_logit = [11 * 7, 3, 2]
+            self.len_logit = [
+                11 * 7 if self.action_config.discrete_arm else 7,
+                3,
+                11 * 2 if self.action_config.discrete_base else 2,
+            ]
         else:
             raise NotImplementedError
 
@@ -200,8 +209,12 @@ class TransformerResNetPolicy(NetPolicy):
             masks,
             deterministic=deterministic,
         )
+        action = action.float()
         if self.action_distribution_type == "mixed":
-            action[:, :7] = self.boundaries_mean[action[:, :7].to(torch.long)]
+            if self.action_config.discrete_base:
+                action[:, 8:10] = self.boundaries_mean[action[:, 8:10].to(torch.long)]
+            if self.action_config.discrete_arm:
+                action[:, :7] = self.boundaries_mean[action[:, :7].to(torch.long)]
             action[:, 7] = (
                 (action[:, 7] == 1).int()
                 + 2 * (action[:, 7] == 0).int()
@@ -236,7 +249,10 @@ class TransformerResNetPolicy(NetPolicy):
     ):
         if self.action_distribution_type == "mixed":
             action = action[:, :10]
-            action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
+            if self.action_config.discrete_base:
+                action[:, 8:10] = torch.bucketize(action[:, 8:10], self.boundaries) - 1
+            if self.action_config.discrete_arm:
+                action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
             action[:, 7] = (
                 (action[:, 7] == 0).int()
                 + 2 * (action[:, 7] == -1).int()
@@ -262,77 +278,156 @@ class TransformerResNetPolicy(NetPolicy):
     ):
         if not self.offline_training:
             raise ValueError
-        features = self.net(
+        features, planner_logits = self.net(
             states, None, actions, None, rtgs=rtgs, offline_training=True
         )
         # if we are given some desired targets also calculate the loss
-        loss = None
-        loss_dict = None
+        loss = 0
+        loss_dict = dict()
 
-        if self.action_distribution_type == "categorical":
-            distribution = self.action_distribution(features)
-            logits = distribution.probs
-        elif self.action_distribution_type == "gaussian":
-            distribution = self.action_distribution(features)
-            logits = distribution.mean
-        elif self.action_distribution_type == "mixed":
-            logits = self.action_distribution(features, return_logits=True)
-        else:
-            raise NotImplementedError
+        if self.train_planner:
+            B = actions.shape[0]
+            temp_target = states["skill"].reshape(B, -1, 1)
 
-        # ======================== separate logits ==========================
-        logits_arm, logits_pick, logits_loc = torch.split(
-            logits, self.len_logit, -1
-        )
+            # ========================== planner action ============================
+            loss_p = F.cross_entropy(
+                planner_logits.permute(0, 2, 1),
+                temp_target.reshape(B, -1).long(),
+                label_smoothing=0.05,
+            )
+            accuracy_p = torch.sum(
+                torch.argmax(planner_logits[:, :, :], dim=-1)
+                == temp_target.reshape(B, -1).long()
+            ) / np.prod(temp_target.shape)
+            loss_dict.update(
+                {
+                    "planner_skill": loss_p.detach().item(),
+                    "accuracy_planner_skill": accuracy_p.detach().item(),
+                }
+            )
+            loss = loss + loss_p
 
-        # =========================== locomotion ============================
-        temp_target = targets[:, :, 8:10]
-        loss1 = F.mse_loss(logits_loc, temp_target)
+        if self.train_control:
 
-        # =========================== arm action ============================
-        temp_target = torch.bucketize(targets[:, :, :7], self.boundaries) - 1
-        logits_arm = logits_arm.view(*logits_arm.shape[:2], 7, 11)
-        loss2 = self.focal_loss(
-            logits_arm[:, :, :, :].permute(0, 3, 1, 2), temp_target[:, :, :7]
-        )
-        accuracy2 = torch.sum(
-            torch.argmax(logits_arm[:, :, :, :], dim=-1)
-            == temp_target[:, :, :7]
-        ) / np.prod(temp_target[:, :, :7].shape)
+            if self.action_distribution_type == "categorical":
+                distribution = self.action_distribution(features)
+                logits = distribution.probs
+            elif self.action_distribution_type == "gaussian":
+                distribution = self.action_distribution(features)
+                logits = distribution.mean
+            elif self.action_distribution_type == "mixed":
+                logits = self.action_distribution(features, return_logits=True)
+            else:
+                raise NotImplementedError
 
-        # ========================= gripper action ==========================
-        loss3 = self.focal_loss_pick(
-            logits_pick.permute(0, 2, 1), targets[:, :, 10].long()
-        )
-        accuracy3 = torch.sum(
-            torch.argmax(logits_pick[:, :, :], dim=-1)
-            == targets[:, :, 10].long()
-        ) / np.prod(targets[:, :, 10].shape)
+            # ======================== separate logits ==========================
+            logits_arm, logits_pick, logits_loc = torch.split(
+                logits, self.len_logit, -1
+            )
 
-        # ========================== stop action ============================
-        # loss4 = F.cross_entropy(logits_stop.permute(0,2,1), targets[:,:,10].long(), label_smoothing=0.05)
-        # accuracy4 = torch.sum(torch.argmax(logits_stop[:,:,:], dim=-1) == targets[:,:,10].long()) / np.prod(targets[:,:,10].shape)
+            # =========================== locomotion ============================
+            if self.action_config.discrete_base:
+                temp_target = (
+                    torch.bucketize(targets[:, :, 8:10], self.boundaries) - 1
+                )
+                logits_loc = logits_loc.view(*logits_loc.shape[:2], 2, 11)
+                loss1 = self.focal_loss_loc(
+                    logits_loc[:, :, :, :].permute(0, 3, 1, 2),
+                    temp_target[:, :, :],
+                )
+                accuracy1 = torch.sum(
+                    torch.argmax(logits_loc[:, :, :, :], dim=-1)
+                    == temp_target[:, :, :]
+                ) / np.prod(temp_target[:, :, :].shape)
+            else:
+                temp_target = targets[:, :, 8:10]
+                loss1 = F.mse_loss(logits_loc, temp_target)
 
-        # ========================== planner action ============================
-        # loss_p = F.cross_entropy(planner_logits.permute(0,2,1), targets[:,:,11].long(), label_smoothing=0.05)
-        # accuracy_p = torch.sum(torch.argmax(planner_logits[:,:,:], dim=-1) == targets[:,:,11].long()) / np.prod(targets[:,:,11].shape)
+            # =========================== arm action ============================
+            if self.action_config.discrete_arm:
+                temp_target = (
+                    torch.bucketize(targets[:, :, :7], self.boundaries) - 1
+                )
+                logits_arm = logits_arm.view(*logits_arm.shape[:2], 7, 11)
+                loss2 = self.focal_loss(
+                    logits_arm[:, :, :, :].permute(0, 3, 1, 2),
+                    temp_target[:, :, :7],
+                )
+                accuracy2 = torch.sum(
+                    torch.argmax(logits_arm[:, :, :, :], dim=-1)
+                    == temp_target[:, :, :7]
+                ) / np.prod(temp_target[:, :, :7].shape)
+            else:
+                temp_target = targets[:, :, :7]
+                loss2 = F.mse_loss(logits_arm, temp_target)
 
-        loss_dict = {
-            "locomotion": loss1.detach().item(),
-            "arm": loss2.detach().item(),
-            "pick": loss3.detach().item(),
-            # "place": loss4.detach().item(),
-            # "accuracy_nav": accuracy1.detach().item(),
-            "accuracy_pick": accuracy3.detach().item(),
-            "accuracy_arm": accuracy2.detach().item(),
-            # "accuracy_place": accuracy4.detach().item(),
-        }
-        loss1 = torch.exp(-self.loss_vars[0]) * loss1 + self.loss_vars[0]
-        loss2 = torch.exp(-self.loss_vars[1]) * loss2 + self.loss_vars[1]
-        loss3 = torch.exp(-self.loss_vars[2]) * loss3 + self.loss_vars[2]
-        # loss4 = torch.exp(-self.loss_vars[2]) * loss4 + self.loss_vars[2]
-        loss = loss1 + loss2 + loss3  # + loss4
+            # ========================= gripper action ==========================
+            loss3 = self.focal_loss_pick(
+                logits_pick.permute(0, 2, 1), targets[:, :, 10].long()
+            )
+            accuracy3 = torch.sum(
+                torch.argmax(logits_pick[:, :, :], dim=-1)
+                == targets[:, :, 10].long()
+            ) / np.prod(targets[:, :, 10].shape)
+
+            # ========================== stop action ============================
+            # loss4 = F.cross_entropy(logits_stop.permute(0,2,1), targets[:,:,10].long(), label_smoothing=0.05)
+            # accuracy4 = torch.sum(torch.argmax(logits_stop[:,:,:], dim=-1) == targets[:,:,10].long()) / np.prod(targets[:,:,10].shape)
+
+            loss_dict.update(
+                {
+                    "locomotion": loss1.detach().item(),
+                    "arm": loss2.detach().item(),
+                    "pick": loss3.detach().item(),
+                    # "place": loss4.detach().item(),
+                    "accuracy_pick": accuracy3.detach().item(),
+                    # "accuracy_place": accuracy4.detach().item(),
+                }
+            )
+
+            if self.action_config.discrete_base:
+                loss_dict.update(
+                    {
+                        "accuracy_nav": accuracy1.detach().item(),
+                    }
+                )
+            else:
+                loss_dict.update(
+                    {
+                        "mse_base": loss1.detach().item(),
+                    }
+                )
+            if self.action_config.discrete_arm:
+                loss_dict.update(
+                    {
+                        "accuracy_arm": accuracy2.detach().item(),
+                    }
+                )
+            else:
+                loss_dict.update(
+                    {
+                        "mse_arm": loss2.detach().item(),
+                    }
+                )
+
+            loss1 = torch.exp(-self.loss_vars[0]) * loss1 + self.loss_vars[0]
+            loss2 = torch.exp(-self.loss_vars[1]) * loss2 + self.loss_vars[1]
+            loss3 = torch.exp(-self.loss_vars[2]) * loss3 + self.loss_vars[2]
+            # loss4 = torch.exp(-self.loss_vars[2]) * loss4 + self.loss_vars[2]
+            loss = loss + loss1 + loss2 + loss3  # + loss4
         return loss, loss_dict
+
+    def get_policy_info(self, infos, dones):
+        policy_infos = []
+        for i, info in enumerate(infos):
+            policy_info = {"cur_skill": self.net.cur_skill[i]}
+            policy_infos.append(policy_info)
+
+        return policy_infos
+
+    @property
+    def hidden_state_hxs_dim(self):
+        return self.net.hidden_state_hxs_dim
 
 
 class TransformerResnetNet(nn.Module):
@@ -499,17 +594,16 @@ class TransformerResnetNet(nn.Module):
                 (0 if self.is_blind else self._hidden_size // 2),
                 rnn_input_size,
             ],
-            n_layer=3,
-            n_head=4,
+            n_layer=2,
+            n_head=8,
             n_embd=self._hidden_size,
             model_type=model_type,
             max_timestep=max_episode_step,
             num_skills=num_skills,
             use_rgb=use_rgb,
+            reg_flags=reg_flags,
         )  # 6,8
-        # self.planner_encoder = GPT(mconf)
-
-        # self.state_encoder = LSTMBC(mconf)
+        self.planner_encoder = PlannerGPT(mconf)
 
         self.train()
 
@@ -564,21 +658,6 @@ class TransformerResnetNet(nn.Module):
                     x.append(visual_feats)
 
         if self._fuse_keys is not None:
-            # observations["obj_start_gps_compass"] = torch.stack(
-            #     [
-            #         observations["obj_start_gps_compass"][:, 0],
-            #         torch.cos(observations["obj_start_gps_compass"][:, 1]),
-            #         torch.sin(observations["obj_start_gps_compass"][:, 1]),
-            #     ]
-            # ).permute(1, 0)
-            # observations["obj_goal_gps_compass"] = torch.stack(
-            #     [
-            #         observations["obj_goal_gps_compass"][:, 0],
-            #         torch.cos(observations["obj_goal_gps_compass"][:, 1]),
-            #         torch.sin(observations["obj_goal_gps_compass"][:, 1]),
-            #     ]
-            # ).permute(1, 0)
-
             fuse_states = torch.cat(
                 [observations[k] for k in self._fuse_keys], dim=-1
             )
@@ -587,12 +666,12 @@ class TransformerResnetNet(nn.Module):
         x = torch.cat(x, dim=1)
         x = x.reshape(B, -1, *x.shape[1:])
 
+        # breakpoint()
+
         if offline_training:
             # Move valid state-action-reward pair to the left
-            # out2 = self.planner_encoder(x)
-            out2 = None
+            out2 = self.planner_encoder(x)
             if "skill" in observations.keys():
-                # assert offline_training, "shouldn't include this in online training or evaluation"
                 x = torch.cat(
                     [x, observations["skill"].reshape(B, -1, 1).float()],
                     dim=-1,
@@ -627,16 +706,24 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -action_dim:
         ] = prev_actions.view(B, -1)
 
-        # out = self.planner_encoder(
-        #     rnn_hidden_states[..., :-action_dim-1],
-        # )
+        out = self.planner_encoder(
+            rnn_hidden_states[..., :-obs_dim],
+        )
         # rnn_hidden_states[
-        #     torch.arange(B), current_context, -action_dim-1
-        # ] = torch.argmax(out[torch.arange(B), current_context], dim=-1)
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
+        # self.cur_skill = torch.argmax(out[torch.arange(B), current_context], dim=-1)
+
+        # rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = observations["is_holding"].reshape(B)
+        # self.cur_skill = observations["is_holding"].reshape(B)
 
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
-        ] = observations["is_holding"].reshape(B)
+        ] = torch.ones(B).cuda()
+        self.cur_skill = observations["is_holding"].reshape(B)
+
 
         rnn_hidden_states = rnn_hidden_states.contiguous()
 
@@ -645,9 +732,5 @@ class TransformerResnetNet(nn.Module):
             rnn_hidden_states[..., -action_dim:],
             rtgs=None,
         )
-
-        # out, _ = self.state_encoder(
-        #     rnn_hidden_states, None, masks
-        # )
 
         return out[torch.arange(B), current_context], rnn_hidden_states, {}
