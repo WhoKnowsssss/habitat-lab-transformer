@@ -74,9 +74,6 @@ RL:
     batch_size: 230
     num_workers: 2
 
-
-
-
     return_to_go: 100
     context_length: 30
     max_episode_step: 500

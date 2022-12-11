@@ -1,5 +1,5 @@
 GYM:
-    AUTO_NAME: "NavPick"
+    AUTO_NAME: "NavPlace"
     OBS_KEYS:
     - robot_head_depth
     - relative_resting_position
@@ -30,7 +30,7 @@ TASK:
     BASE_NOISE: 0.05
     EASY_INIT: false
     TASK_SPEC_BASE_PATH: configs/tasks/rearrange/pddl/
-    TASK_SPEC: nav_pick
+    TASK_SPEC: nav_place
     PDDL_DOMAIN_DEF: replica_cad
     SENSORS:
     - RELATIVE_RESTING_POS_SENSOR

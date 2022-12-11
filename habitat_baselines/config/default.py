@@ -35,6 +35,7 @@ _C.VIDEO_RENDER_TOP_DOWN = True
 _C.VIDEO_RENDER_ALL_INFO = False
 _C.TEST_EPISODE_COUNT = -1
 _C.EVAL_CKPT_PATH_DIR = "data/checkpoints"  # path to ckpt or path to ckpts dir
+_C.RESUME_CKPT = ""
 _C.NUM_ENVIRONMENTS = 16
 _C.NUM_PROCESSES = -1  # depricated
 _C.SENSORS = ["RGB_SENSOR", "DEPTH_SENSOR"]

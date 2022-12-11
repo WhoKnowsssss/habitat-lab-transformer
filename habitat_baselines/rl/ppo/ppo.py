@@ -145,11 +145,11 @@ class PPO(nn.Module):
                         ),
                     ]
             else:
-                optim_kwargs = [ dict(
+                optim_kwargs = dict(
                     params=params,
                     lr=lr,
                     eps=eps,
-                ) ]
+                )
 
             signature = inspect.signature(optim_cls.__init__)
             if "foreach" in signature.parameters:
@@ -162,7 +162,10 @@ class PPO(nn.Module):
                 else:
                     optim_cls = torch.optim._multi_tensor.Adam
 
-            self.optimizer = optim_cls(optim_kwargs)
+            if isinstance(optim_kwargs, dict):
+                self.optimizer = optim_cls(**optim_kwargs)
+            else:
+                self.optimizer = optim_cls(optim_kwargs)
             # HACK one more **
         else:
             self.optimizer = None
@@ -201,7 +204,9 @@ class PPO(nn.Module):
             for p in pg["params"]:
                 p.grad = None
 
-    def update(self, rollouts: RolloutStorage, num_, value_func_iter) -> Dict[str, float]:
+    def update(
+        self, rollouts: RolloutStorage, num_, value_func_iter
+    ) -> Dict[str, float]:
 
         advantages = self.get_advantages(rollouts)
 
@@ -252,7 +257,7 @@ class PPO(nn.Module):
                 )
                 action_loss = -torch.min(surr1, surr2)
                 if num_ < value_func_iter:
-                    action_loss = action_loss * 0. #HACK
+                    action_loss = action_loss * 0.0  # HACK
 
                 values = values.float()
                 orig_values = values

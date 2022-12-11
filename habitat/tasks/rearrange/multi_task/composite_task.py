@@ -62,6 +62,7 @@ class CompositeTask(RearrangeTask):
         self.pddl_problem.bind_to_instance(
             self._sim, cast(RearrangeDatasetV0, self._dataset), self, episode
         )
+        self.pddl_problem.set_init()
 
         if self._cur_node_idx >= 0:
             self.jump_to_node(self._cur_node_idx, episode)

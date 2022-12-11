@@ -534,6 +534,10 @@ class PddlProblem(PddlDomain):
             key=lambda x: x.name,
         )
 
+    def set_init(self):
+        for init_pred in self.init:
+            init_pred.set_state(self.sim_info)
+
     def get_ordered_actions(self) -> List[PddlAction]:
         return sorted(
             self.actions.values(),
