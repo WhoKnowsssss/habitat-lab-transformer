@@ -2,16 +2,19 @@ GYM:
     AUTO_NAME: Place
     OBS_KEYS:
     - robot_head_depth
+    - relative_resting_position
+    - obj_start_sensor
     - obj_goal_sensor
+    - obj_start_gps_compass
+    - obj_goal_gps_compass
     - joint
     - is_holding
-    - relative_resting_position
 ENVIRONMENT:
     MAX_EPISODE_STEPS: 300
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/{split}/rearrange_easy.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_easy.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangePlaceTask-v0
@@ -36,17 +39,20 @@ TASK:
     END_ON_SUCCESS: true
 
     SENSORS:
+    - RELATIVE_RESTING_POS_SENSOR
     - TARGET_START_SENSOR
     - GOAL_SENSOR
     - JOINT_SENSOR
     - IS_HOLDING_SENSOR
     - END_EFFECTOR_SENSOR
-    - RELATIVE_RESTING_POS_SENSOR
-    - OBJECT_SENSOR
+    - TARGET_START_GPS_COMPASS_SENSOR
+    - TARGET_GOAL_GPS_COMPASS_SENSOR
+    - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
-        MAX_ACCUM_FORCE: 10_000.0
-        MAX_INSTANT_FORCE: 10_000.0
+        MAX_ACCUM_FORCE: -1.0 
+        # MAX_ACCUM_FORCE: 10_000.0
+        # MAX_INSTANT_FORCE: 10_000.0
     PLACE_REWARD:
         TYPE: PlaceReward
         DIST_REWARD: 2.0
@@ -80,6 +86,7 @@ TASK:
     POSSIBLE_ACTIONS:
     - ARM_ACTION
     - BASE_VELOCITY
+    - REARRANGE_STOP
 SIMULATOR:
     ADDITIONAL_OBJECT_PATHS:
     - data/objects/ycb/configs/

@@ -240,6 +240,11 @@ def read_dataset(
             except:
                 continue
 
+            for i in range(len(temp_obs)):
+                if temp_obs[i]["skill"] == 0 and temp_obs[i]["is_holding"] == 1:
+                    # temp_actions[i,8] = 0
+                    temp_obs[i]["skill"] = 4
+
             obss += [temp_obs]
             actions += [temp_actions]
             done_idxs += [temp_done_idxs + previous_done]

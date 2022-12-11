@@ -362,6 +362,7 @@ class TransformerTrainer(BaseRLTrainer):
         if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 10:
             fn = os.listdir(self.config.CHECKPOINT_FOLDER)
             fn = [int(f.split('.')[1]) if f != '.habitat-resume-state.pth' else -1 for f in fn]
+            fn.sort()
             os.remove(
                 os.path.join(
                     self.config.CHECKPOINT_FOLDER,
@@ -592,7 +593,7 @@ class TransformerTrainer(BaseRLTrainer):
                     }
                 )
             self.optimizer.load_state_dict(resume_state["optim_state"])
-            lr_scheduler_after.load_state_dict(resume_state["lr_sched_state"])
+            # lr_scheduler_after.load_state_dict(resume_state["lr_sched_state"])
             lr_scheduler.total_epoch = 0
 
             requeue_stats = resume_state["requeue_stats"]
@@ -971,6 +972,8 @@ class TransformerTrainer(BaseRLTrainer):
                     #     if len(success_counter_temp) > 0
                     #     else 0,
                     # )
+                    for k, v in aggregated_stats.items():
+                        print(f"Average episode {k}: {v:.4f}")
 
                     # gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     # if gfx_str != "":

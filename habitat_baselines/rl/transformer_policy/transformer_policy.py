@@ -212,9 +212,13 @@ class TransformerResNetPolicy(NetPolicy):
         action = action.float()
         if self.action_distribution_type == "mixed":
             if self.action_config.discrete_base:
-                action[:, 8:10] = self.boundaries_mean[action[:, 8:10].to(torch.long)]
+                action[:, 8:10] = self.boundaries_mean[
+                    action[:, 8:10].to(torch.long)
+                ]
             if self.action_config.discrete_arm:
-                action[:, :7] = self.boundaries_mean[action[:, :7].to(torch.long)]
+                action[:, :7] = self.boundaries_mean[
+                    action[:, :7].to(torch.long)
+                ]
             action[:, 7] = (
                 (action[:, 7] == 1).int()
                 + 2 * (action[:, 7] == 0).int()
@@ -229,6 +233,36 @@ class TransformerResNetPolicy(NetPolicy):
         mask = ~torch.any((rnn_hidden_states.sum(-1) == 0), -1)
         rnn_hidden_states[mask] = rnn_hidden_states[mask].roll(-1, 1)
         rnn_hidden_states[mask, -1, :] = 0
+
+        # #============= reset arm ===============
+        B = rnn_hidden_states.shape[0]
+        if not hasattr(self, "reset_mask"):
+            self.reset_mask = torch.zeros(
+                B, dtype=torch.bool, device=rnn_hidden_states.device
+            )
+
+        if not hasattr(self, "holding_mask"):
+            self.holding_mask = torch.zeros(
+                B, dtype=torch.bool, device=rnn_hidden_states.device
+            )
+
+        if not hasattr(self, "_initial_delta"):
+            self._initial_delta = torch.zeros(
+                (B, 7), dtype=torch.float, device=rnn_hidden_states.device
+            )
+
+        holding_mask = (
+            self.holding_mask != observations["is_holding"].reshape(B)
+        ) & (self.net.cur_skill != 3)
+        self.holding_mask = observations["is_holding"].reshape(B)
+
+        self.reset_mask = self.reset_mask | holding_mask | self.net.reset_mask
+        self._reset_arm(
+            observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
+        )
+
+        action[:,7] = 1
+        self.gripper_action = action[:,7]
 
         return (
             value,
@@ -250,9 +284,13 @@ class TransformerResNetPolicy(NetPolicy):
         if self.action_distribution_type == "mixed":
             action = action[:, :10]
             if self.action_config.discrete_base:
-                action[:, 8:10] = torch.bucketize(action[:, 8:10], self.boundaries) - 1
+                action[:, 8:10] = (
+                    torch.bucketize(action[:, 8:10], self.boundaries) - 1
+                )
             if self.action_config.discrete_arm:
-                action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
+                action[:, :7] = (
+                    torch.bucketize(action[:, :7], self.boundaries) - 1
+                )
             action[:, 7] = (
                 (action[:, 7] == 0).int()
                 + 2 * (action[:, 7] == -1).int()
@@ -287,19 +325,23 @@ class TransformerResNetPolicy(NetPolicy):
 
         if self.train_planner:
             B = actions.shape[0]
-            
+
             aux_logits = planner_logits[1]
             planner_logits = planner_logits[0]
 
-            temp_target = torch.cat([states["obj_start_gps_compass"].reshape(B, -1, 2), 
-            states["obj_goal_gps_compass"].reshape(B, -1, 2), ], dim=-1)
-            
+            temp_target = torch.cat(
+                [
+                    states["obj_start_gps_compass"].reshape(B, -1, 2),
+                    states["obj_goal_gps_compass"].reshape(B, -1, 2),
+                ],
+                dim=-1,
+            )
+
             loss_aux = F.mse_loss(aux_logits, temp_target)
             loss = loss + loss_aux
-            
-            temp_target = states["skill"].reshape(B, -1, 1)
 
             # ========================== planner action ============================
+            temp_target = states["skill"].reshape(B, -1, 1)
             loss_p = F.cross_entropy(
                 planner_logits.permute(0, 2, 1),
                 temp_target.reshape(B, -1).long(),
@@ -432,7 +474,12 @@ class TransformerResNetPolicy(NetPolicy):
     def get_policy_info(self, infos, dones):
         policy_infos = []
         for i, info in enumerate(infos):
-            policy_info = {"cur_skill": self.net.cur_skill[i]}
+            policy_info = {
+                "cur_skill": self.net.cur_skill[i],
+                "reset_arm": self.reset_mask[i],
+                "gripper": self.gripper_action[i],
+                "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3])
+            }
             policy_infos.append(policy_info)
 
         return policy_infos
@@ -440,6 +487,42 @@ class TransformerResNetPolicy(NetPolicy):
     @property
     def hidden_state_hxs_dim(self):
         return self.net.hidden_state_hxs_dim
+
+    def _reset_arm(
+        self, observations, prev_actions, rnn_hidden_states, reset_mask
+    ):
+        self._target = torch.tensor(
+            [
+                -4.5003259e-01,
+                -1.0799699e00,
+                9.9526465e-02,
+                9.3869519e-01,
+                -7.8854430e-04,
+                1.5702540e00,
+                4.6168058e-03,
+            ],
+            device=rnn_hidden_states.device,
+        )
+        self._initial_delta[reset_mask] = (
+            self._target - observations["joint"]
+        )[reset_mask]
+
+        current_joint_pos = observations["joint"]
+        delta = self._target - current_joint_pos
+
+        # Dividing by max initial delta means that the action will
+        # always in [-1,1] and has the benefit of reducing the delta
+        # amount was we converge to the target.
+        delta = delta / torch.maximum(
+            self._initial_delta.max(-1, keepdims=True)[0],
+            torch.tensor(1e-5, device=rnn_hidden_states.device),
+        )
+
+        prev_actions[self.reset_mask, :7] = delta[self.reset_mask]
+
+        self.reset_mask = self.reset_mask & ~(
+            torch.abs(current_joint_pos - self._target).max(-1)[0] < 5e-2
+        )
 
 
 class TransformerResnetNet(nn.Module):
@@ -718,24 +801,45 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -action_dim:
         ] = prev_actions.view(B, -1)
 
-        out = self.planner_encoder(
+        out, predicted_dist = self.planner_encoder(
             rnn_hidden_states[..., :-obs_dim],
         )
+        self.predicted_dist = predicted_dist[torch.arange(B), current_context]
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
         ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
-        self.cur_skill = torch.argmax(out[torch.arange(B), current_context], dim=-1)
 
         # rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
-        # ] = observations["is_holding"].reshape(B)
-        # self.cur_skill = observations["is_holding"].reshape(B)
+        # ] = observations["is_holding"].reshape(B) 
 
-        # rnn_hidden_states[
+        # if observations['is_holding'][0] == 1:
+        #     rnn_hidden_states[
+        #         torch.arange(B), current_context, -obs_dim
+        #     ] = torch.ones(B).cuda() * 2 if observations['obj_goal_gps_compass'][0,0] < 1 else torch.ones(B).cuda() * 0
+        # else:
+        #     rnn_hidden_states[
+        #         torch.arange(B), current_context, -obs_dim
+        #     ] = torch.ones(B).cuda() * 1 if observations['obj_start_gps_compass'][0,0] < 1 else torch.ones(B).cuda() * 0
+
+        # mask = rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
-        # ] = torch.ones(B).cuda() * 1
-        # self.cur_skill = torch.ones(B).cuda() * 1
+        # ] == 1
+        # rnn_hidden_states[
+        #     mask, current_context, -obs_dim
+        # ] = 3
 
+        if not hasattr(self, "cur_skill"):
+            self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)
+
+        self.reset_mask = (
+            rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
+            != self.cur_skill
+        ) & (self.cur_skill != 0)
+
+        self.cur_skill = rnn_hidden_states[
+            torch.arange(B), current_context, -obs_dim
+        ]
 
         rnn_hidden_states = rnn_hidden_states.contiguous()
 

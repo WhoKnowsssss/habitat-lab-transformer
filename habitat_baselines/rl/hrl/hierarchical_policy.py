@@ -204,7 +204,8 @@ class HierarchicalPolicy(Policy):
                     **dat,
                     batch_idx=batch_ids,
                 )
-            except:
+            except Exception as e:
+                print(e)
                 breakpoint()
         should_terminate = should_terminate.cpu()
         bad_should_terminate = bad_should_terminate.cpu()

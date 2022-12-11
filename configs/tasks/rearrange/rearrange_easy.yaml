@@ -10,7 +10,7 @@ GYM:
     - joint
     - is_holding
 ENVIRONMENT:
-    MAX_EPISODE_STEPS: 1000
+    MAX_EPISODE_STEPS: 2000
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
@@ -68,7 +68,7 @@ TASK:
     - DID_PICK_OBJECT
     ACTIONS:
         ARM_ACTION:
-            GRIP_CONTROLLER: SuctionGraspAction
+            GRIP_CONTROLLER: MagicGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
 
     POSSIBLE_ACTIONS:

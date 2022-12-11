@@ -63,7 +63,8 @@ class NavSkillPolicy(NnSkillPolicy):
     def _is_skill_done(
         self, observations, rnn_hidden_states, prev_actions, masks, batch_idx
     ) -> torch.BoolTensor:
-        return (self._did_want_done[batch_idx] > 0.0).to(masks.device)
+        prob_done = (self._did_want_done[batch_idx] > 0.0).to(masks.device)
+        return prob_done & (observations[NavGoalPointGoalSensor.cls_uuid][:, 0] < .75)
 
     def _parse_skill_arg(self, skill_arg):
         targ_name, targ_idx = skill_arg[-2].split("|")

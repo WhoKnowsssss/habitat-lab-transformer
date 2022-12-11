@@ -10,7 +10,7 @@ GYM:
     - joint
     - is_holding
 ENVIRONMENT:
-    MAX_EPISODE_STEPS: 300
+    MAX_EPISODE_STEPS: 600
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
@@ -155,7 +155,7 @@ SIMULATOR:
         WIDTH: 128
 
     HABITAT_SIM_V0:
-        ALLOW_SLIDING: True
+        ALLOW_SLIDING: False
         ENABLE_PHYSICS: True
         GPU_DEVICE_ID: 0
         GPU_GPU: False

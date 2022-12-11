@@ -4,6 +4,7 @@ TRAINER_NAME: "transformer"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
+# VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/npnp_25k_train"
 VIDEO_FPS: 30
@@ -13,11 +14,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_rel_arm_aux"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_rel_arm_full"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/rearrange_rel_arm_full"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_rel_arm_separate_nav"
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 1.0e8
 LOG_INTERVAL: 1
@@ -58,7 +59,7 @@ RL:
     trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange"
     # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
     files_per_load: 5
-    queue_size: 10
+    queue_size: 2
 
 
     steps_to_reload: 5000
@@ -120,5 +121,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "rearrange_rel_arm_full"
+  RUN_NAME: "rearrange_rel_arm_separate_nav"
   GROUP: "trfm_variable_test"

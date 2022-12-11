@@ -33,7 +33,7 @@ RL:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
       ACTION_DIST:
-        discrete_arm: true
+        discrete_arm: false
         discrete_base: false
         use_std_param: true
         temperature: 1.0
@@ -44,7 +44,7 @@ RL:
       offline: false
       include_visual_keys: ["robot_head_depth"] # "robot_head_depth", robot_head_rgb
       train_planner: true
-      train_control: false
+      train_control: true
       
 
   GYM_OBS_KEYS: ['obj_start_sensor', 'obj_start_gps_compass', 'obj_goal_sensor', 'obj_goal_gps_compass', 'relative_resting_position', 'joint', 'is_holding']
