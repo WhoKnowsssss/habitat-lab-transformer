@@ -288,6 +288,11 @@ class PPOTrainer(BaseRLTrainer):
             os.makedirs(self.config.CHECKPOINT_FOLDER)
 
         self._setup_actor_critic_agent(ppo_cfg)
+        if self.config.RESUME_CKPT != "" and resume_state is None:
+            resume_state = torch.load(
+                self.config.RESUME_CKPT, map_location="cpu"
+            )
+
         if resume_state is not None:
             self.agent.load_state_dict(resume_state["state_dict"])
             # self.agent.optimizer.load_state_dict(resume_state["optim_state"])
@@ -1223,9 +1228,9 @@ class PPOTrainer(BaseRLTrainer):
                                 "composite_success"
                             ]
                             if "open" in buffer_infos[i][idx]["skill"]:
-                                full=True
+                                full = True
                             else:
-                                full=False
+                                full = False
                         if full:
                             success_counter_temp.append(
                                 infos[i]["composite_success"]
@@ -1298,8 +1303,10 @@ class PPOTrainer(BaseRLTrainer):
                         aggregated_stats["composite_success"],
                     )
                     print(
-                        "Rearrange success: ", 
-                        sum(success_counter_temp)/len(success_counter_temp) if len(success_counter_temp) > 0 else 0
+                        "Rearrange success: ",
+                        sum(success_counter_temp) / len(success_counter_temp)
+                        if len(success_counter_temp) > 0
+                        else 0,
                     )
 
                     gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")

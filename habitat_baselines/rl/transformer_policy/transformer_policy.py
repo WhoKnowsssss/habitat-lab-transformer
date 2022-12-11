@@ -212,9 +212,13 @@ class TransformerResNetPolicy(NetPolicy):
         action = action.float()
         if self.action_distribution_type == "mixed":
             if self.action_config.discrete_base:
-                action[:, 8:10] = self.boundaries_mean[action[:, 8:10].to(torch.long)]
+                action[:, 8:10] = self.boundaries_mean[
+                    action[:, 8:10].to(torch.long)
+                ]
             if self.action_config.discrete_arm:
-                action[:, :7] = self.boundaries_mean[action[:, :7].to(torch.long)]
+                action[:, :7] = self.boundaries_mean[
+                    action[:, :7].to(torch.long)
+                ]
             action[:, 7] = (
                 (action[:, 7] == 1).int()
                 + 2 * (action[:, 7] == 0).int()
@@ -250,9 +254,13 @@ class TransformerResNetPolicy(NetPolicy):
         if self.action_distribution_type == "mixed":
             action = action[:, :10]
             if self.action_config.discrete_base:
-                action[:, 8:10] = torch.bucketize(action[:, 8:10], self.boundaries) - 1
+                action[:, 8:10] = (
+                    torch.bucketize(action[:, 8:10], self.boundaries) - 1
+                )
             if self.action_config.discrete_arm:
-                action[:, :7] = torch.bucketize(action[:, :7], self.boundaries) - 1
+                action[:, :7] = (
+                    torch.bucketize(action[:, :7], self.boundaries) - 1
+                )
             action[:, 7] = (
                 (action[:, 7] == 0).int()
                 + 2 * (action[:, 7] == -1).int()
@@ -287,16 +295,21 @@ class TransformerResNetPolicy(NetPolicy):
 
         if self.train_planner:
             B = actions.shape[0]
-            
+
             aux_logits = planner_logits[1]
             planner_logits = planner_logits[0]
 
-            temp_target = torch.cat([states["obj_start_gps_compass"].reshape(B, -1, 2), 
-            states["obj_goal_gps_compass"].reshape(B, -1, 2), ], dim=-1)
-            
+            temp_target = torch.cat(
+                [
+                    states["obj_start_gps_compass"].reshape(B, -1, 2),
+                    states["obj_goal_gps_compass"].reshape(B, -1, 2),
+                ],
+                dim=-1,
+            )
+
             loss_aux = F.mse_loss(aux_logits, temp_target)
             loss = loss + loss_aux
-            
+
             temp_target = states["skill"].reshape(B, -1, 1)
 
             # ========================== planner action ============================
@@ -724,7 +737,9 @@ class TransformerResnetNet(nn.Module):
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
         ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
-        self.cur_skill = torch.argmax(out[torch.arange(B), current_context], dim=-1)
+        self.cur_skill = torch.argmax(
+            out[torch.arange(B), current_context], dim=-1
+        )
 
         # rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
@@ -735,7 +750,6 @@ class TransformerResnetNet(nn.Module):
         #     torch.arange(B), current_context, -obs_dim
         # ] = torch.ones(B).cuda() * 1
         # self.cur_skill = torch.ones(B).cuda() * 1
-
 
         rnn_hidden_states = rnn_hidden_states.contiguous()
 

@@ -35,12 +35,27 @@ RL:
       ACTION_DIST:
         discrete_arm: true
         discrete_base: false
+        use_std_param: true
+        temperature: 1.0
+      use_rgb: false
+      offline: false
+      train_planner: true
+      train_control: true
+
   TRANSFORMER:
     return_to_go: 100
-    context_length: 30
+    context_length: 30 #10
     model_type: "bc"
     n_head: 8
     n_layer: 6
+    freeze_layer: [0,1,2,3] #
+    reg_flags: 
+      outer_dropout: false
+      outer_layernorm: true
+      attention_dropout: false
+      attention_layernorm: true
+      feedforward_dropout: false
+      feedforward_layernorm: true
     hidden_size: 512
     backbone: resnet18
 
@@ -61,6 +76,8 @@ RL:
     use_linear_clip_decay: False
     use_linear_lr_decay: False
     reward_window_size: 50
+
+    value_func_warmup: 200
 
     use_normalized_advantage: False
 
