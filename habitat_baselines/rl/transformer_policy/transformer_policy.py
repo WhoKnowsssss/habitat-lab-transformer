@@ -97,35 +97,11 @@ class TransformerResNetPolicy(NetPolicy):
             action_space=action_space,
             policy_config=policy_config,
         )
-        self.boundaries_mean = torch.tensor(
-            [-1.0, -0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        ).cuda()
-        self.boundaries = torch.tensor(
-            [-1.1, -0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
-        ).cuda()
+        self.boundaries_mean = torch.linspace(-1, 1, 21 ).cuda()
+        self.boundaries = torch.linspace(-1.025, 1.025, 22).cuda()
         if self.offline_training:
             self.loss_vars = nn.parameter.Parameter(torch.zeros((3,)))
-            self.focal_loss = FocalLoss(
-                alpha=(
-                    1
-                    - torch.tensor(
-                        [
-                            0.05,
-                            0.0125,
-                            0.0125,
-                            0.0125,
-                            0.0125,
-                            0.8,
-                            0.0125,
-                            0.0125,
-                            0.0125,
-                            0.0125,
-                            0.05,
-                        ]
-                    )
-                ),
-                gamma=5,
-            ).cuda()
+            self.focal_loss = FocalLoss(gamma=5).cuda()
             self.focal_loss_loc = FocalLoss(gamma=5).cuda()
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
@@ -134,14 +110,14 @@ class TransformerResNetPolicy(NetPolicy):
         self.action_config = policy_config.ACTION_DIST
 
         if self.action_distribution_type == "categorical":
-            self.len_logit = [11 * 7, 3, 11 * 2]
+            self.len_logit = [21  * 7, 3, 21  * 2]
         elif self.action_distribution_type == "gaussian":
             self.len_logit = [7, 1, 2]
         elif self.action_distribution_type == "mixed":
             self.len_logit = [
-                11 * 7 if self.action_config.discrete_arm else 7,
+                21  * 7 if self.action_config.discrete_arm else 7,
                 3,
-                11 * 2 if self.action_config.discrete_base else 2,
+                21  * 2 if self.action_config.discrete_base else 2,
             ]
         else:
             raise NotImplementedError
@@ -260,6 +236,9 @@ class TransformerResNetPolicy(NetPolicy):
         self._reset_arm(
             observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
         )
+        # self._back_up(
+        #     observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
+        # )
 
         action[:,7] = 1
         self.gripper_action = action[:,7]
@@ -384,7 +363,7 @@ class TransformerResNetPolicy(NetPolicy):
                 temp_target = (
                     torch.bucketize(targets[:, :, 8:10], self.boundaries) - 1
                 )
-                logits_loc = logits_loc.view(*logits_loc.shape[:2], 2, 11)
+                logits_loc = logits_loc.view(*logits_loc.shape[:2], 2, 21 )
                 loss1 = self.focal_loss_loc(
                     logits_loc[:, :, :, :].permute(0, 3, 1, 2),
                     temp_target[:, :, :],
@@ -402,7 +381,7 @@ class TransformerResNetPolicy(NetPolicy):
                 temp_target = (
                     torch.bucketize(targets[:, :, :7], self.boundaries) - 1
                 )
-                logits_arm = logits_arm.view(*logits_arm.shape[:2], 7, 11)
+                logits_arm = logits_arm.view(*logits_arm.shape[:2], 7, 21 )
                 loss2 = self.focal_loss(
                     logits_arm[:, :, :, :].permute(0, 3, 1, 2),
                     temp_target[:, :, :7],
@@ -478,7 +457,8 @@ class TransformerResNetPolicy(NetPolicy):
                 "cur_skill": self.net.cur_skill[i],
                 "reset_arm": self.reset_mask[i],
                 "gripper": self.gripper_action[i],
-                "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3])
+                "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3]),
+                "timeout": self.net.timeout[i] 
             }
             policy_infos.append(policy_info)
 
@@ -523,6 +503,14 @@ class TransformerResNetPolicy(NetPolicy):
         self.reset_mask = self.reset_mask & ~(
             torch.abs(current_joint_pos - self._target).max(-1)[0] < 5e-2
         )
+
+
+    def _back_up(self, observations, prev_actions, rnn_hidden_states, reset_mask
+    ):
+        if self.net.timeout[0] > 100 and (self.net.cur_skill[0] == 0 or self.net.cur_skill[0] == 4):
+            prev_actions[0, 8:10] = torch.tensor([-1, 0]).cuda()
+            self.net.timeout[0] -= 20
+
 
 
 class TransformerResnetNet(nn.Module):
@@ -676,7 +664,7 @@ class TransformerResnetNet(nn.Module):
         self.state_encoder = GPT(mconf)
         # self.state_encoder = LSTMBC(mconf)
         # self.state_encoder = build_rnn_state_encoder(
-        #     256+21+12,
+        #     256+21 +12,
         #     self._hidden_size,
         #     rnn_type='lstm',
         #     num_layers=2,
@@ -809,18 +797,6 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -obs_dim
         ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
 
-        # rnn_hidden_states[
-        #     torch.arange(B), current_context, -obs_dim
-        # ] = observations["is_holding"].reshape(B) 
-
-        # if observations['is_holding'][0] == 1:
-        #     rnn_hidden_states[
-        #         torch.arange(B), current_context, -obs_dim
-        #     ] = torch.ones(B).cuda() * 2 if observations['obj_goal_gps_compass'][0,0] < 1 else torch.ones(B).cuda() * 0
-        # else:
-        #     rnn_hidden_states[
-        #         torch.arange(B), current_context, -obs_dim
-        #     ] = torch.ones(B).cuda() * 1 if observations['obj_start_gps_compass'][0,0] < 1 else torch.ones(B).cuda() * 0
 
         # mask = rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
@@ -831,6 +807,24 @@ class TransformerResnetNet(nn.Module):
 
         if not hasattr(self, "cur_skill"):
             self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)
+
+        if not hasattr(self, "timeout"):
+            self.timeout = torch.zeros(B, device=rnn_hidden_states.device)
+
+        self.timeout *= masks.view(-1)
+        
+        mask = rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == self.cur_skill
+        self.timeout[mask] += 1
+        self.timeout[~mask] = 0
+
+        # if self.timeout[0] > 150 and (self.cur_skill[0] == 1 or self.cur_skill[0] == 2):
+        #     prob = torch.softmax(out[torch.arange(B), current_context], dim=-1).cpu().numpy()
+        #     prob[0,:4] = 0.25
+        #     prob[0,4:] = 0
+        #     select = torch.from_numpy(np.array([np.random.choice(np.arange(10), p=prob[0])])).float().cuda()
+        #     rnn_hidden_states[
+        #         torch.arange(B), current_context, -obs_dim
+        #     ] = select
 
         self.reset_mask = (
             rnn_hidden_states[torch.arange(B), current_context, -obs_dim]

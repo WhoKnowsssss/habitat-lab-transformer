@@ -1126,11 +1126,13 @@ class PPOTrainer(BaseRLTrainer):
                     not_done_masks,
                     deterministic=True,
                 )
+                # actions[:,:10] = actions[:,:10] + torch.randn(actions[:,:10].shape).cuda() * 0.1
 
                 prev_actions.copy_(actions)  # type: ignore
             # NB: Move actions to CPU.  If CUDA tensors are
             # sent in to env.step(), that will create CUDA contexts
             # in the subprocesses.
+            
             if is_continuous_action_space(self.policy_action_space):
                 # Clipping actions to the specified limits
                 step_data = [

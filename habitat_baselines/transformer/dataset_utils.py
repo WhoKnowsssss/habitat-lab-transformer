@@ -36,8 +36,11 @@ def read_dataset(
     }
 
     path = config.trajectory_dir
-
-    filenames = os.listdir(path)
+    dataset_size = config.dataset_size
+    if dataset_size != -1:
+        filenames = os.listdir(path)[:dataset_size]
+    else:
+        filenames = os.listdir(path)
     # filenames = ['{}.pt'.format(i*10) for i in range(1,51)]
 
     if verbose:
@@ -215,11 +218,6 @@ def read_dataset(
                 except:
                     pass
 
-            # ==================== Abs Arm Action ==================
-            # for i in range(len(temp_obs) - 1):
-            #     temp_actions[i, :7] = temp_obs[i + 1]["joint"]
-            # temp_actions[-1, :7] = temp_actions[-2, :7]
-
             # ==================== Add Noise ========================
             # for i in range(len(temp_obs)):
             #     for k in temp_obs[i].keys():
@@ -231,8 +229,6 @@ def read_dataset(
 
             # ==================== Planner Targets ==================
             try:
-                # for i in range(len(temp_obs)):
-                #     temp_obs[i]['skill'] = temp_obs[i]['is_holding']
                 for i in range(len(temp_obs)):
                     temp_obs[i]["skill"] = skill_dict[temp_infos[i]["skill"]]
                     if temp_obs[i]["skill"] == -1:
@@ -244,6 +240,14 @@ def read_dataset(
                 if temp_obs[i]["skill"] == 0 and temp_obs[i]["is_holding"] == 1:
                     # temp_actions[i,8] = 0
                     temp_obs[i]["skill"] = 4
+            
+                if temp_obs[i]["skill"] == 4 or temp_obs[i]["skill"] == 0:
+                    temp_actions[i,:7] = 0
+
+
+            # for i in range(len(temp_obs)):
+            #     if temp_obs[i]['skill'] != 3:
+            #         temp_obs[i]['skill'] = int(temp_obs[i]['is_holding'])
 
             obss += [temp_obs]
             actions += [temp_actions]

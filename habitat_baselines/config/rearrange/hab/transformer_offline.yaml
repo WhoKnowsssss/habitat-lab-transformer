@@ -6,7 +6,7 @@ TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
 # VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/npnp_25k_train"
+VIDEO_DIR: "video_dir/rearrange_2layer_discrete_all"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -14,13 +14,14 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_rel_arm_full"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_2layer_discrete_all"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/rearrange_rel_arm_separate_nav"
-NUM_UPDATES: -1
-TOTAL_NUM_STEPS: 1.0e8
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_2layer_discrete_all"
+NUM_UPDATES: 800
+TEST_INTERVAL: 30
+TOTAL_NUM_STEPS: -1.0
 LOG_INTERVAL: 1
 NUM_CHECKPOINTS: -1
 CHECKPOINT_INTERVAL: 30
@@ -38,8 +39,8 @@ RL:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
       ACTION_DIST:
-        discrete_arm: false
-        discrete_base: false
+        discrete_arm: true
+        discrete_base: true
         use_std_param: true
         temperature: 1.0
       use_rgb: false
@@ -56,23 +57,27 @@ RL:
   SLACK_REWARD: -0.01
 
   TRAJECTORY_DATASET:
-    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange"
-    # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
+    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange_easy"
+    # trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange_easy"
+    dataset_size: 10000
     files_per_load: 5
-    queue_size: 2
+    queue_size: 1
 
-
-    steps_to_reload: 5000
-    trajs_per_file: 10
-
+  VALIDATION_DATASET:
+    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange_easy_eval"
+    dataset_size: -1
+    files_per_load: 5
+    queue_size: 1
 
   TRANSFORMER:
-    lr: 1.0E-5
+    lr: 1.0E-4
     eps: 1.0E-5
     grad_norm_clip: 0.5
     use_linear_lr_decay: True
-    batch_size: 230
+    batch_size: 115
     num_workers: 2
+
+    warmup_updates: 200
 
     return_to_go: 100
     context_length: 30
@@ -80,7 +85,7 @@ RL:
     # model_type: "reward_conditioned"
     model_type: "bc"
     n_head: 8
-    n_layer: 6
+    n_layer: 2
     freeze_layer: [] #
     reg_flags: 
       outer_dropout: true
@@ -102,7 +107,7 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: "data/ckpts/npnp_25k_seq_offline/ckpt.1.pth" #
+    pretrained_weights: "data/ckpts/ckpt.24.pth" #
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights
@@ -118,5 +123,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "rearrange_rel_arm_separate_nav"
-  GROUP: "trfm_variable_test"
+  RUN_NAME: "rearrange_2layer_discrete_all"
+  GROUP: "trfm_2layer_hyperparam"

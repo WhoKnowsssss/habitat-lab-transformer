@@ -224,19 +224,19 @@ class MixedDistributionNet(ActionDistributionNet):
 
         n_actions = get_num_actions(action_space)
         ac_spaces = {
-            "arm": spaces.Dict({k: spaces.Discrete(11) for k in range(7)})
+            "arm": spaces.Dict({k: spaces.Discrete(21 ) for k in range(7)})
             if config.discrete_arm
             else spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32),
             "gripper": spaces.Discrete(3),
             "locomotion": spaces.Dict(
-                {k: spaces.Discrete(11) for k in range(2)}
+                {k: spaces.Discrete(21 ) for k in range(2)}
             )
             if config.discrete_base
             else spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
         }
 
-        self.boundaries_mean = torch.linspace(-1, 1, 11).cuda()
-        self.boundaries = torch.linspace(-1.1, 1.1, 12).cuda()
+        self.boundaries_mean = torch.linspace(-1, 1, 21 ).cuda()
+        self.boundaries = torch.linspace(-1.025, 1.025, 22).cuda()
 
         self.action_space = spaces.Dict(ac_spaces)
 

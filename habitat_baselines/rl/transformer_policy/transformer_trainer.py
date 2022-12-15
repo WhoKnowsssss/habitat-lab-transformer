@@ -61,6 +61,7 @@ from habitat_baselines.rl.ddppo.policy import (  # noqa: F401.
 )
 from habitat_baselines.transformer.dataset import RollingDataset
 from habitat_baselines.utils.common import (
+    cosine_decay,
     batch_obs,
     generate_video,
     get_num_actions,
@@ -289,19 +290,33 @@ class TransformerTrainer(BaseRLTrainer):
             rank0_only(),
         )
 
-        def collate_fn(data):
-            return self.train_dataset.get_batch()
+        self.test_dataset = RollingDataset(
+            self.config.RL.VALIDATION_DATASET,
+            self.config.RL.TRANSFORMER.context_length,
+            (world_size, world_rank, self.config.TASK_CONFIG.SEED),
+            self.dataset_context,
+            rank0_only(),
+        )
 
         self.train_loader = DataLoader(
             self.train_dataset,
             pin_memory=True,
             batch_size=self.config.RL.TRANSFORMER.batch_size,
             num_workers=self.config.RL.TRANSFORMER.num_workers,
-            collate_fn=collate_fn,
+            collate_fn=self.train_dataset.get_batch,
             persistent_workers=True,
         )
 
-        self.optimizer = torch.optim.Adam(
+        self.test_loader = DataLoader(
+            self.test_dataset,
+            pin_memory=True,
+            batch_size=self.config.RL.TRANSFORMER.batch_size,
+            num_workers=1,
+            collate_fn=self.test_dataset.get_batch,
+            persistent_workers=True,
+        )
+
+        self.optimizer = torch.optim.AdamW(
             list(
                 filter(
                     lambda p: p.requires_grad,
@@ -336,6 +351,11 @@ class TransformerTrainer(BaseRLTrainer):
                     find_unused_parameters=find_unused_params,
                 )
             )
+        self.transformer_policy = (
+            torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                self.transformer_policy
+            ).to(self.device)
+        )
 
     @rank0_only
     @profiling_wrapper.RangeContext("save_checkpoint")
@@ -359,9 +379,14 @@ class TransformerTrainer(BaseRLTrainer):
             checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
         )
 
-        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 10:
+        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 4:
             fn = os.listdir(self.config.CHECKPOINT_FOLDER)
-            fn = [int(f.split('.')[1]) if f != '.habitat-resume-state.pth' else -1 for f in fn]
+            fn = [
+                int(f.split(".")[1])
+                if f != ".habitat-resume-state.pth"
+                else -1
+                for f in fn
+            ]
             fn.sort()
             os.remove(
                 os.path.join(
@@ -493,14 +518,35 @@ class TransformerTrainer(BaseRLTrainer):
             losses,
             self.num_updates_done,
         )
+        writer.add_scalar(
+            f"learning_rate",
+            self.optimizer.param_groups[0]["lr"],
+            self.num_updates_done,
+        )
+
+    @rank0_only
+    def _testing_log(
+        self, writer, losses: Dict[str, float], prev_time: int = 0
+    ):
+        writer.add_scalars(
+            "test/losses",
+            losses,
+            self.num_updates_done,
+        )
 
     def _run_epoch(self, split: str, epoch_num: int = 0):
-        is_train = split == "train"
+        is_train = not (
+            (self.num_updates_done % self.config.TEST_INTERVAL == 0)
+            and not self.evaluated
+        )
         self.transformer_policy.train(is_train)
 
-        pbar = tqdm(
-            enumerate(self.train_loader)
-        )  # #  # if is_train else enumerate(self.train_loader)
+        if is_train:
+            pbar = tqdm(enumerate(self.train_loader))
+            self.evaluated = False
+        else:
+            pbar = tqdm(enumerate(self.test_loader))
+            self.evaluated = True
         losses = []
         for it, (x, y, r, t) in pbar:
             # place data on the correct device
@@ -513,7 +559,7 @@ class TransformerTrainer(BaseRLTrainer):
             t = t.to(self.device)
 
             # forward the model
-            with torch.set_grad_enabled(is_train):
+            with torch.set_grad_enabled(True):
                 # logits, loss = model(x, y, r)
                 loss, loss_dict = self.transformer_policy(x, y, y, r, t)
                 loss = (
@@ -521,25 +567,34 @@ class TransformerTrainer(BaseRLTrainer):
                 )  # collapse all losses if they are scattered on multiple gpus
                 losses.append(loss_dict)
 
-            if is_train:
-
                 # backprop and update the parameters
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    self.transformer_policy.parameters(),
-                    self.config.RL.TRANSFORMER.grad_norm_clip,
-                )
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                self.transformer_policy.parameters(),
+                self.config.RL.TRANSFORMER.grad_norm_clip,
+            )
+            if is_train:
                 self.optimizer.step()
                 # report progress
-                if rank0_only():
-                    pbar.set_description(
-                        f"epoch {epoch_num+1} iter {it}: train loss {loss.detach().item():.5f}."
-                    )
+                # if rank0_only():
+                pbar.set_description(
+                    f"Epoch {epoch_num+1} iter {it}: Train loss {loss.detach().item():.5f}."
+                )
+            else:
+                # if rank0_only():
+                pbar.set_description(
+                    f"TEST epoch {epoch_num} iter {it}: TEST loss {loss.detach().item():.5f}."
+                )
 
-        losses = {k: np.mean([d[k] for d in losses]) for k in loss_dict.keys()}
+        losses = {
+            k: torch.from_numpy(
+                np.array([np.mean([d[k] for d in losses])])
+            ).to(self.device)
+            for k in loss_dict.keys()
+        }
         print("LR:::", self.optimizer.param_groups[0]["lr"])
-        return losses
+        return losses, is_train
 
     @profiling_wrapper.RangeContext("train")
     def train(self) -> None:
@@ -549,18 +604,20 @@ class TransformerTrainer(BaseRLTrainer):
         """
 
         self._init_train()
+        self.evaluated = False
 
         count_checkpoints = 0
         prev_time = 0
 
         lr_scheduler_after = LambdaLR(
             optimizer=self.optimizer,
-            lr_lambda=lambda x: 1 - self.percent_done(),
+            # lr_lambda=lambda x: 1 - self.percent_done(),
+            lr_lambda=lambda x: cosine_decay(self.percent_done()),
         )
         lr_scheduler = GradualWarmupScheduler(
             self.optimizer,
             multiplier=1,
-            total_epoch=100,  # 100
+            total_epoch=self.config.RL.TRANSFORMER.warmup_updates,  # 100
             after_scheduler=lr_scheduler_after,
         )
 
@@ -593,7 +650,7 @@ class TransformerTrainer(BaseRLTrainer):
                     }
                 )
             self.optimizer.load_state_dict(resume_state["optim_state"])
-            # lr_scheduler_after.load_state_dict(resume_state["lr_sched_state"])
+            lr_scheduler_after.load_state_dict(resume_state["lr_sched_state"])
             lr_scheduler.total_epoch = 0
 
             requeue_stats = resume_state["requeue_stats"]
@@ -604,7 +661,7 @@ class TransformerTrainer(BaseRLTrainer):
             # self._last_checkpoint_percent = requeue_stats[
             #     "_last_checkpoint_percent"
             # ]
-            # count_checkpoints = requeue_stats["count_checkpoints"]
+            count_checkpoints = requeue_stats["count_checkpoints"]
             # prev_time = requeue_stats["prev_time"]
 
             # self.running_episode_stats = requeue_stats["running_episode_stats"]
@@ -625,7 +682,7 @@ class TransformerTrainer(BaseRLTrainer):
                     requeue_stats = dict(
                         # env_time=self.env_time,
                         # pth_time=self.pth_time,
-                        # count_checkpoints=count_checkpoints,
+                        count_checkpoints=count_checkpoints,
                         # num_steps_done=self.num_steps_done,
                         num_updates_done=self.num_updates_done,
                         # _last_checkpoint_percent=self._last_checkpoint_percent,
@@ -651,17 +708,22 @@ class TransformerTrainer(BaseRLTrainer):
                     return
 
                 self.train_dataset.set_epoch(self.num_updates_done)
+                self.test_dataset.set_epoch(0)
 
-                if self.config.RL.TRANSFORMER.use_linear_lr_decay:
-                    lr_scheduler.step()  # type: ignore
-
-                loss = self._run_epoch(
-                    "train", epoch_num=self.num_updates_done
-                )
-
-                self.num_updates_done += 1
-
-                self._training_log(writer, loss, prev_time)
+                with self.transformer_policy.join():
+                    loss, is_train = self._run_epoch(
+                        "train", epoch_num=self.num_updates_done
+                    )
+                for k in loss:
+                    torch.distributed.all_reduce(loss[k]) / 2
+                    loss[k] = loss[k].cpu().item()
+                if is_train:
+                    self._training_log(writer, loss, prev_time)
+                    self.num_updates_done += 1
+                    if self.config.RL.TRANSFORMER.use_linear_lr_decay:
+                        lr_scheduler.step()  # type: ignore
+                else:
+                    self._testing_log(writer, loss, prev_time)
 
                 # checkpoint model
                 if rank0_only() and self.should_checkpoint():
@@ -675,6 +737,8 @@ class TransformerTrainer(BaseRLTrainer):
                     count_checkpoints += 1
 
                 profiling_wrapper.range_pop()  # train update
+
+        self.eval()
 
     def _eval_checkpoint(
         self,
@@ -827,7 +891,8 @@ class TransformerTrainer(BaseRLTrainer):
         pbar = tqdm(total=number_of_eval_episodes * evals_per_ep)
         self.actor_critic.eval()
 
-        success_counter_temp = []
+        first_nav_success_counter_temp = {}
+        second_nav_success_counter_temp = {}
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
             and self.envs.num_envs > 0
@@ -852,6 +917,28 @@ class TransformerTrainer(BaseRLTrainer):
             # NB: Move actions to CPU.  If CUDA tensors are
             # sent in to env.step(), that will create CUDA contexts
             # in the subprocesses.
+            if (
+                current_episodes_info[0].episode_id
+                not in first_nav_success_counter_temp.keys()
+            ):
+                first_nav_success_counter_temp[
+                    current_episodes_info[0].episode_id
+                ] = False
+                second_nav_success_counter_temp[
+                    current_episodes_info[0].episode_id
+                ] = False
+            if batch["obj_start_gps_compass"][0, 0] < 1.5:
+                first_nav_success_counter_temp[
+                    current_episodes_info[0].episode_id
+                ] = True
+            if (
+                batch["obj_goal_gps_compass"][0, 0] < 1.5
+                and batch["is_holding"][0] == 1
+            ):
+                second_nav_success_counter_temp[
+                    current_episodes_info[0].episode_id
+                ] = True
+
             if is_continuous_action_space(self.policy_action_space):
                 # Clipping actions to the specified limits
                 step_data = [
@@ -944,7 +1031,8 @@ class TransformerTrainer(BaseRLTrainer):
                             video_option=self.config.VIDEO_OPTION,
                             video_dir=self.config.VIDEO_DIR,
                             images=rgb_frames[i],
-                            episode_id=current_episodes_info[i].episode_id+f"_{len(stats_episodes)}",
+                            episode_id=current_episodes_info[i].episode_id
+                            + f"_{len(stats_episodes)}",
                             checkpoint_idx=checkpoint_index,
                             metrics=self._extract_scalars_from_info(infos[i]),
                             fps=self.config.VIDEO_FPS,
@@ -966,14 +1054,51 @@ class TransformerTrainer(BaseRLTrainer):
                     #     "\n\nSuccess Rate: ",
                     #     aggregated_stats["composite_success"],
                     # )
-                    # print(
-                    #     "Rearrange success: ",
-                    #     sum(success_counter_temp) / len(success_counter_temp)
-                    #     if len(success_counter_temp) > 0
-                    #     else 0,
-                    # )
+                    print(
+                        "Nav Success: ",
+                        sum(first_nav_success_counter_temp.values())
+                        / len(first_nav_success_counter_temp.values())
+                        if len(first_nav_success_counter_temp) > 0
+                        else 0,
+                    )
+                    first_nav_success = (
+                        sum(first_nav_success_counter_temp.values())
+                        / len(first_nav_success_counter_temp.values())
+                        if len(first_nav_success_counter_temp) > 0
+                        else 0
+                    )
+                    second_nav_success = (
+                        sum(second_nav_success_counter_temp.values())
+                        / len(second_nav_success_counter_temp.values())
+                        if len(second_nav_success_counter_temp) > 0
+                        else 0
+                    )
+                    pick_success = aggregated_stats[
+                        "composite_stage_goals.stage_0_5_success"
+                    ]
+                    place_success = aggregated_stats[
+                        "composite_stage_goals.stage_1_success"
+                    ]
+                    metrics = {
+                        "first_nav_success": first_nav_success,
+                        "pick_success": pick_success / first_nav_success if first_nav_success != 0 else 0,
+                        "second_nav_success": second_nav_success / pick_success if pick_success != 0 else 0,
+                        "place_success": place_success / second_nav_success if second_nav_success != 0 else 0,
+                    }
+                    for k, v in metrics.items():
+                        writer.add_scalar(
+                            f"success_rate_metrics/{k}", v, num_episodes
+                        )
                     for k, v in aggregated_stats.items():
                         print(f"Average episode {k}: {v:.4f}")
+
+                    metrics = {
+                        k: v
+                        for k, v in aggregated_stats.items()
+                        if k != "reward"
+                    }
+                    for k, v in metrics.items():
+                        writer.add_scalar(f"eval_metrics/{k}", v, num_episodes)
 
                     # gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     # if gfx_str != "":

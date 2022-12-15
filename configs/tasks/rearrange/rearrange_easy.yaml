@@ -68,7 +68,7 @@ TASK:
     - DID_PICK_OBJECT
     ACTIONS:
         ARM_ACTION:
-            GRIP_CONTROLLER: MagicGraspAction
+            GRIP_CONTROLLER: SuctionGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
 
     POSSIBLE_ACTIONS:

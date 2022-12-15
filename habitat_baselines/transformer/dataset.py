@@ -90,7 +90,6 @@ class RollingDataset(IterableDataset):
             self.config = config
             self.context_length = context_length
             self.dataset_context = dataset_context
-            self.steps_to_reload = config.steps_to_reload
             self.world_rank = world_rank
             num_replicas, rank, self.seed = sampler_params
             assert ((num_replicas is None) == (rank is None)), "Local or Distributed Training? "
@@ -99,7 +98,6 @@ class RollingDataset(IterableDataset):
             else:
                 self.num_replicas = num_replicas
                 self.rank = rank
-                self.steps_to_reload = self.steps_to_reload // num_replicas
                 self._is_distributed = True
 
             self.dataset_context['num_iterated'] = 0
@@ -192,7 +190,7 @@ class RollingDataset(IterableDataset):
     def set_epoch(self, epoch):
         self.iterator.set_epoch(epoch)
 
-    def get_batch(self):
+    def get_batch(self, data):
         B = len(self.iterator.batch_idx)
         batch_idx = torch.cat(self.iterator.batch_idx)
         self.iterator.batch_idx = []

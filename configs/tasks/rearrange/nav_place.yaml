@@ -4,15 +4,17 @@ GYM:
     - robot_head_depth
     - relative_resting_position
     - obj_start_sensor
+    - obj_goal_sensor
     - obj_start_gps_compass
+    - obj_goal_gps_compass
     - joint
     - is_holding
 ENVIRONMENT:
-    MAX_EPISODE_STEPS: 500
+    MAX_EPISODE_STEPS: 1000
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/{split}/all_receptacles_10k_1k.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_easy.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangeCompositeTask-v0
@@ -33,12 +35,15 @@ TASK:
     TASK_SPEC: nav_place
     PDDL_DOMAIN_DEF: replica_cad
     SENSORS:
-    - RELATIVE_RESTING_POS_SENSOR
+    -  RELATIVE_RESTING_POS_SENSOR
     - TARGET_START_SENSOR
+    - GOAL_SENSOR
     - JOINT_SENSOR
     - IS_HOLDING_SENSOR
     - END_EFFECTOR_SENSOR
     - TARGET_START_GPS_COMPASS_SENSOR
+    - TARGET_GOAL_GPS_COMPASS_SENSOR
+    - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
         MAX_ACCUM_FORCE: -1.0
@@ -74,7 +79,7 @@ TASK:
         ARM_ACTION:
             TYPE: ArmAction
             ARM_CONTROLLER: ArmRelPosAction
-            GRIP_CONTROLLER: MagicGraspAction
+            GRIP_CONTROLLER: SuctionGraspAction
             ARM_JOINT_DIMENSIONALITY: 7
             GRASP_THRESH_DIST: 0.15
             DISABLE_GRIP: false
@@ -123,15 +128,15 @@ SIMULATOR:
         - 0
         - 0
         - 1
-        ROBOT_URDF: ./data/robots/hab_fetch/robots/hab_fetch.urdf
-        ROBOT_TYPE: FetchRobot
+        ROBOT_URDF: ./data/robots/hab_fetch/robots/hab_suction_v2.urdf
+        ROBOT_TYPE: FetchSuctionRobot
         IK_ARM_URDF: ./data/robots/hab_fetch/robots/fetch_onlyarm.urdf
     HEAD_RGB_SENSOR:
         WIDTH: 128
         HEIGHT: 128
     HEAD_DEPTH_SENSOR:
-        WIDTH: 128
-        HEIGHT: 128
+        WIDTH: 256
+        HEIGHT: 256
         MIN_DEPTH: 0.0
         MAX_DEPTH: 10.0
         NORMALIZE_DEPTH: true

@@ -52,6 +52,7 @@ class ArtObjSkillPolicy(NnSkillPolicy):
         )
 
         is_not_holding = ~is_holding
+        # print(is_not_holding, is_within_thresh, self._did_leave_start_zone[batch_idx])
         return is_not_holding & is_within_thresh & self._did_leave_start_zone[batch_idx]
 
     def _parse_skill_arg(self, skill_arg):

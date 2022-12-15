@@ -101,6 +101,8 @@ class StripsHighLevelPolicy(HighLevelPolicy):
                     use_idx = self._next_sol_idxs[batch_idx].item()
 
                 skill_name, skill_args = plan[use_idx]
+                # print(skill_name, self._env_to_plan)
+                # breakpoint()
                 if skill_name not in self._skill_name_to_idx:
                     raise ValueError(
                         f"Could not find skill named {skill_name} in {self._skill_name_to_idx}"

@@ -48,9 +48,8 @@ class LSTMBC(nn.Module):
         # self.tok_emb = nn.Linear(256+32+21, 512)
         nn.init.normal_(self.action_embeddings[0].weight, mean=0.0, std=0.02)
 
-        self.boundaries = torch.tensor(
-            [-1.1, -0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9, 1.1]
-        ).cuda()
+        self.boundaries_mean = torch.linspace(-1, 1, 21 ).cuda()
+        self.boundaries = torch.linspace(-1.025, 1.025, 22).cuda()
 
     def get_block_size(self):
         return self.block_size

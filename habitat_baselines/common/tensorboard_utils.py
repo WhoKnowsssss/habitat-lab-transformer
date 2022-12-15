@@ -130,7 +130,7 @@ class WeightsAndBiasesWriter:
             wb_kwargs["resume"] = "must"
 
         self.run = wandb.init(
-            config={"slurm": slurm_info_dict, **config}, **wb_kwargs
+            config={"slurm": slurm_info_dict, **config}, **wb_kwargs, settings=wandb.Settings(start_method='thread')
         )
 
     def __getattr__(self, item):

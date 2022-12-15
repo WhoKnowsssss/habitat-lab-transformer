@@ -55,6 +55,7 @@ class NavSkillPolicy(NnSkillPolicy):
                 idx_dict[replace_sensor].append(idx)
             for k, v in idx_dict.items():
                 ret_obs[NavGoalPointGoalSensor.cls_uuid][v] = observations[k][v]
+            self.left_dist = ret_obs[NavGoalPointGoalSensor.cls_uuid][:,0]
         return ret_obs
 
     def _get_multi_sensor_index(self, batch_idx):
@@ -64,7 +65,7 @@ class NavSkillPolicy(NnSkillPolicy):
         self, observations, rnn_hidden_states, prev_actions, masks, batch_idx
     ) -> torch.BoolTensor:
         prob_done = (self._did_want_done[batch_idx] > 0.0).to(masks.device)
-        return prob_done & (observations[NavGoalPointGoalSensor.cls_uuid][:, 0] < .75)
+        return prob_done #& (self.left_dist < 1.)
 
     def _parse_skill_arg(self, skill_arg):
         targ_name, targ_idx = skill_arg[-2].split("|")
