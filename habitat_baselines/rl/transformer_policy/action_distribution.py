@@ -228,6 +228,9 @@ class MixedDistributionNet(ActionDistributionNet):
             if config.discrete_arm
             else spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32),
             "gripper": spaces.Discrete(3),
+            # "locomotion": spaces.Dict(
+            #     {k: spaces.Discrete(21 * 21 ) for k in range(1)}
+            # )
             "locomotion": spaces.Dict(
                 {k: spaces.Discrete(21 ) for k in range(2)}
             )

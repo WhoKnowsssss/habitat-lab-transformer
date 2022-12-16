@@ -103,7 +103,7 @@ class BaseTrainer:
             self.config = resume_state["config"]
             prev_ckpt_ind = resume_state["prev_ckpt_ind"]
         else:
-            prev_ckpt_ind = -2
+            prev_ckpt_ind = -1
 
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)
@@ -146,14 +146,45 @@ class BaseTrainer:
                     checkpoint_index=ckpt_idx,
                 )
             else:
+                # # evaluate multiple checkpoints in order
+                # while True:
+                #     current_ckpt = None
+                #     while current_ckpt is None:
+                #         current_ckpt = poll_checkpoint_folder(
+                #             self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind
+                #         )
+                #         time.sleep(2)  # sleep for 2 secs before polling again
+                #     logger.info(f"=======current_ckpt: {current_ckpt}=======")  # type: ignore
+                #     prev_ckpt_ind += 1
+                #     self._eval_checkpoint(
+                #         checkpoint_path=current_ckpt,
+                #         writer=writer,
+                #         checkpoint_index=prev_ckpt_ind,
+                #     )
+
+                #     # We save a resume state during evaluation so that
+                #     # we can resume evaluating incase the job gets
+                #     # preempted.
+                #     save_resume_state(
+                #         {
+                #             "config": self.config,
+                #             "prev_ckpt_ind": prev_ckpt_ind,
+                #         },
+                #         self.config,
+                #         filename_key="eval",
+                #     )
+
+                #     if (prev_ckpt_ind + 1) == self.config.NUM_CHECKPOINTS:
+                #         break
                 # evaluate multiple checkpoints in order
                 while True:
                     current_ckpt = None
                     while current_ckpt is None:
+                        logger.info(f"=======poll folder: {self.config.EVAL_CKPT_PATH_DIR}=======")
                         current_ckpt = poll_checkpoint_folder(
                             self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind
                         )
-                        time.sleep(2)  # sleep for 2 secs before polling again
+                        time.sleep(100)  # sleep for 2 secs before polling again
                     logger.info(f"=======current_ckpt: {current_ckpt}=======")  # type: ignore
                     prev_ckpt_ind += 1
                     self._eval_checkpoint(
@@ -161,22 +192,7 @@ class BaseTrainer:
                         writer=writer,
                         checkpoint_index=prev_ckpt_ind,
                     )
-
-                    # We save a resume state during evaluation so that
-                    # we can resume evaluating incase the job gets
-                    # preempted.
-                    save_resume_state(
-                        {
-                            "config": self.config,
-                            "prev_ckpt_ind": prev_ckpt_ind,
-                        },
-                        self.config,
-                        filename_key="eval",
-                    )
-
-                    if (prev_ckpt_ind + 1) == self.config.NUM_CHECKPOINTS:
-                        break
-
+                
     def _eval_checkpoint(
         self,
         checkpoint_path: str,

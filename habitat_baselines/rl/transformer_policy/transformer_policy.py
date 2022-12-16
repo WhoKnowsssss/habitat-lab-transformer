@@ -118,6 +118,7 @@ class TransformerResNetPolicy(NetPolicy):
                 21  * 7 if self.action_config.discrete_arm else 7,
                 3,
                 21  * 2 if self.action_config.discrete_base else 2,
+                # 21  * 21 if self.action_config.discrete_base else 2,
             ]
         else:
             raise NotImplementedError
@@ -363,6 +364,10 @@ class TransformerResNetPolicy(NetPolicy):
                 temp_target = (
                     torch.bucketize(targets[:, :, 8:10], self.boundaries) - 1
                 )
+                
+                # temp_target = (temp_target[:,:,0] * 21 + temp_target[:,:,1]).view(*logits_loc.shape[:2], 1).long()
+
+                # logits_loc = logits_loc.view(*logits_loc.shape[:2], 1, 21 * 21)
                 logits_loc = logits_loc.view(*logits_loc.shape[:2], 2, 21 )
                 loss1 = self.focal_loss_loc(
                     logits_loc[:, :, :, :].permute(0, 3, 1, 2),

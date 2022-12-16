@@ -379,7 +379,7 @@ class TransformerTrainer(BaseRLTrainer):
             checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
         )
 
-        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 4:
+        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 9:
             fn = os.listdir(self.config.CHECKPOINT_FOLDER)
             fn = [
                 int(f.split(".")[1])
@@ -710,13 +710,18 @@ class TransformerTrainer(BaseRLTrainer):
                 self.train_dataset.set_epoch(self.num_updates_done)
                 self.test_dataset.set_epoch(0)
 
-                with self.transformer_policy.join():
+                if self._is_distributed:
+                    with self.transformer_policy.join():
+                        loss, is_train = self._run_epoch(
+                            "train", epoch_num=self.num_updates_done
+                        )
+                    for k in loss:
+                        torch.distributed.all_reduce(loss[k])
+                        loss[k] = loss[k].cpu().item() / 2
+                else:
                     loss, is_train = self._run_epoch(
                         "train", epoch_num=self.num_updates_done
                     )
-                for k in loss:
-                    torch.distributed.all_reduce(loss[k]) / 2
-                    loss[k] = loss[k].cpu().item()
                 if is_train:
                     self._training_log(writer, loss, prev_time)
                     self.num_updates_done += 1
@@ -894,8 +899,10 @@ class TransformerTrainer(BaseRLTrainer):
         first_nav_success_counter_temp = {}
         second_nav_success_counter_temp = {}
         while (
-            len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
-            and self.envs.num_envs > 0
+            # len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
+            # and self.envs.num_envs > 0
+            len(stats_episodes)
+            < 200
         ):
             current_episodes_info = self.envs.current_episodes()
 
@@ -1054,51 +1061,51 @@ class TransformerTrainer(BaseRLTrainer):
                     #     "\n\nSuccess Rate: ",
                     #     aggregated_stats["composite_success"],
                     # )
-                    print(
-                        "Nav Success: ",
-                        sum(first_nav_success_counter_temp.values())
-                        / len(first_nav_success_counter_temp.values())
-                        if len(first_nav_success_counter_temp) > 0
-                        else 0,
-                    )
-                    first_nav_success = (
-                        sum(first_nav_success_counter_temp.values())
-                        / len(first_nav_success_counter_temp.values())
-                        if len(first_nav_success_counter_temp) > 0
-                        else 0
-                    )
-                    second_nav_success = (
-                        sum(second_nav_success_counter_temp.values())
-                        / len(second_nav_success_counter_temp.values())
-                        if len(second_nav_success_counter_temp) > 0
-                        else 0
-                    )
-                    pick_success = aggregated_stats[
-                        "composite_stage_goals.stage_0_5_success"
-                    ]
-                    place_success = aggregated_stats[
-                        "composite_stage_goals.stage_1_success"
-                    ]
-                    metrics = {
-                        "first_nav_success": first_nav_success,
-                        "pick_success": pick_success / first_nav_success if first_nav_success != 0 else 0,
-                        "second_nav_success": second_nav_success / pick_success if pick_success != 0 else 0,
-                        "place_success": place_success / second_nav_success if second_nav_success != 0 else 0,
-                    }
-                    for k, v in metrics.items():
-                        writer.add_scalar(
-                            f"success_rate_metrics/{k}", v, num_episodes
-                        )
+                    # print(
+                    #     "Nav Success: ",
+                    #     sum(first_nav_success_counter_temp.values())
+                    #     / len(first_nav_success_counter_temp.values())
+                    #     if len(first_nav_success_counter_temp) > 0
+                    #     else 0,
+                    # )
+                    # first_nav_success = (
+                    #     sum(first_nav_success_counter_temp.values())
+                    #     / len(first_nav_success_counter_temp.values())
+                    #     if len(first_nav_success_counter_temp) > 0
+                    #     else 0
+                    # )
+                    # second_nav_success = (
+                    #     sum(second_nav_success_counter_temp.values())
+                    #     / len(second_nav_success_counter_temp.values())
+                    #     if len(second_nav_success_counter_temp) > 0
+                    #     else 0
+                    # )
+                    # pick_success = aggregated_stats[
+                    #     "composite_stage_goals.stage_0_5_success"
+                    # ]
+                    # place_success = aggregated_stats[
+                    #     "composite_stage_goals.stage_1_success"
+                    # ]
+                    # metrics = {
+                    #     "first_nav_success": first_nav_success,
+                    #     "pick_success": pick_success / first_nav_success if first_nav_success != 0 else 0,
+                    #     "second_nav_success": second_nav_success / pick_success if pick_success != 0 else 0,
+                    #     "place_success": place_success / second_nav_success if second_nav_success != 0 else 0,
+                    # }
+                    # for k, v in metrics.items():
+                    #     writer.add_scalar(
+                    #         f"success_rate_metrics/{k}", v, num_episodes
+                    #     )
                     for k, v in aggregated_stats.items():
                         print(f"Average episode {k}: {v:.4f}")
 
-                    metrics = {
-                        k: v
-                        for k, v in aggregated_stats.items()
-                        if k != "reward"
-                    }
-                    for k, v in metrics.items():
-                        writer.add_scalar(f"eval_metrics/{k}", v, num_episodes)
+                    # metrics = {
+                    #     k: v
+                    #     for k, v in aggregated_stats.items()
+                    #     if k != "reward"
+                    # }
+                    # for k, v in metrics.items():
+                    #     writer.add_scalar(f"eval_metrics/{k}", v, num_episodes)
 
                     # gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     # if gfx_str != "":
@@ -1146,9 +1153,9 @@ class TransformerTrainer(BaseRLTrainer):
             )
 
         pbar.close()
-        assert (
-            len(ep_eval_count) >= number_of_eval_episodes
-        ), f"Expected {number_of_eval_episodes} episodes, got {len(ep_eval_count)}."
+        # assert (
+        #     len(ep_eval_count) >= number_of_eval_episodes
+        # ), f"Expected {number_of_eval_episodes} episodes, got {len(ep_eval_count)}."
 
         aggregated_stats = {}
         for stat_key in next(iter(stats_episodes.values())).keys():
@@ -1170,5 +1177,38 @@ class TransformerTrainer(BaseRLTrainer):
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
+
+        first_nav_success = (
+            sum(first_nav_success_counter_temp.values())
+            / len(first_nav_success_counter_temp.values())
+            if len(first_nav_success_counter_temp) > 0
+            else 0
+        )
+        second_nav_success = (
+            sum(second_nav_success_counter_temp.values())
+            / len(second_nav_success_counter_temp.values())
+            if len(second_nav_success_counter_temp) > 0
+            else 0
+        )
+        pick_success = aggregated_stats[
+            "composite_stage_goals.stage_0_5_success"
+        ]
+        place_success = aggregated_stats[
+            "composite_stage_goals.stage_1_success"
+        ]
+        metrics = {
+            "first_nav_success": first_nav_success,
+            "pick_success": pick_success / first_nav_success
+            if first_nav_success != 0
+            else 0,
+            "second_nav_success": second_nav_success / pick_success
+            if pick_success != 0
+            else 0,
+            "place_success": place_success / second_nav_success
+            if second_nav_success != 0
+            else 0,
+        }
+        for k, v in metrics.items():
+            writer.add_scalar(f"success_rate_metrics/{k}", v, step_id)
 
         self.envs.close()

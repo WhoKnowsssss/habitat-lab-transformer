@@ -6,7 +6,7 @@ TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
 # VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/rearrange_2layer_discrete_all"
+VIDEO_DIR: "video_dir/rearrange_2layer_discrete"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -14,17 +14,17 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_2layer_discrete_all"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_2layer_discrete"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/rearrange_2layer_discrete_all"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_2layer_discrete"
 NUM_UPDATES: 800
-TEST_INTERVAL: 30
+TEST_INTERVAL: 20
 TOTAL_NUM_STEPS: -1.0
 LOG_INTERVAL: 1
 NUM_CHECKPOINTS: -1
-CHECKPOINT_INTERVAL: 30
+CHECKPOINT_INTERVAL: 100
 FORCE_TORCH_SINGLE_THREADED: True
 EVAL_KEYS_TO_INCLUDE_IN_NAME: ['success'] #'reward', 'force', 
 EVAL:
@@ -39,7 +39,7 @@ RL:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
       ACTION_DIST:
-        discrete_arm: true
+        discrete_arm: false
         discrete_base: true
         use_std_param: true
         temperature: 1.0
@@ -123,5 +123,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "rearrange_2layer_discrete_all"
+  RUN_NAME: "rearrange_2layer_discrete"
   GROUP: "trfm_2layer_hyperparam"
