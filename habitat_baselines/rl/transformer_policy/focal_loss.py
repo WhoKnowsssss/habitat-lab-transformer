@@ -52,13 +52,16 @@ class FocalLoss(nn.Module):
         arg_str = ', '.join(arg_strs)
         return f'{type(self).__name__}({arg_str})'
 
-    def forward(self, x: Tensor, y: Tensor) -> Tensor:
+    def forward(self, x: Tensor, y: Tensor, reduction=None) -> Tensor:
         if x.ndim > 2:
             # (N, C, d1, d2, ..., dK) --> (N * d1 * ... * dK, C)
             c = x.shape[1]
             x = x.permute(0, *range(2, x.ndim), 1).reshape(-1, c)
             # (N, d1, d2, ..., dK) --> (N * d1 * ... * dK,)
             y = y.view(-1)
+
+        if reduction is not None: 
+            self.reduction = reduction
 
         unignored_mask = y != self.ignore_index
         y = y[unignored_mask]

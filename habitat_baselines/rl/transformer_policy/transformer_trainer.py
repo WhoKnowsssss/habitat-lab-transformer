@@ -717,7 +717,7 @@ class TransformerTrainer(BaseRLTrainer):
                         )
                     for k in loss:
                         torch.distributed.all_reduce(loss[k])
-                        loss[k] = loss[k].cpu().item() / 2
+                        loss[k] = loss[k].cpu().item() 
                 else:
                     loss, is_train = self._run_epoch(
                         "train", epoch_num=self.num_updates_done

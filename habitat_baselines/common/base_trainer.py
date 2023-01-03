@@ -103,7 +103,7 @@ class BaseTrainer:
             self.config = resume_state["config"]
             prev_ckpt_ind = resume_state["prev_ckpt_ind"]
         else:
-            prev_ckpt_ind = -1
+            prev_ckpt_ind = -2
 
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)
@@ -184,7 +184,9 @@ class BaseTrainer:
                         current_ckpt = poll_checkpoint_folder(
                             self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind
                         )
-                        time.sleep(100)  # sleep for 2 secs before polling again
+                        if current_ckpt is None:
+                            logger.info(f"=======checkpoint not found: {self.config.EVAL_CKPT_PATH_DIR}=======")
+                            time.sleep(100)  # sleep for 2 secs before polling again
                     logger.info(f"=======current_ckpt: {current_ckpt}=======")  # type: ignore
                     prev_ckpt_ind += 1
                     self._eval_checkpoint(
@@ -285,6 +287,9 @@ class BaseRLTrainer(BaseTrainer):
             needs_checkpoint = (
                 self.num_updates_done % self.config.CHECKPOINT_INTERVAL
             ) == 0
+
+        if needs_checkpoint:
+            print("\n\n# updates: ", self.num_updates_done)
 
         return needs_checkpoint
 

@@ -1,11 +1,12 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/nav_open.yaml
 TRAINER_NAME: "transformer"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
+# VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/rearrange_easy_test"
+VIDEO_DIR: "video_dir/rearrange_test_17_2"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -13,16 +14,17 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_easy_test"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_test_17"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/rearrange_easy_test"
-NUM_UPDATES: -1
-TOTAL_NUM_STEPS: 1.0e8
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_test_17"
+NUM_UPDATES: 800
+TEST_INTERVAL: 20
+TOTAL_NUM_STEPS: -1.0
 LOG_INTERVAL: 1
 NUM_CHECKPOINTS: -1
-CHECKPOINT_INTERVAL: 30
+CHECKPOINT_INTERVAL: 100
 FORCE_TORCH_SINGLE_THREADED: True
 EVAL_KEYS_TO_INCLUDE_IN_NAME: ['success'] #'reward', 'force', 
 EVAL:
@@ -37,15 +39,15 @@ RL:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
       ACTION_DIST:
-        discrete_arm: true
-        discrete_base: true
+        discrete_arm: false
+        discrete_base: false
         use_std_param: true
         temperature: 1.0
       use_rgb: false
       offline: true
       include_visual_keys: ["robot_head_depth"] # "robot_head_depth", robot_head_rgb
-      train_planner: false
-      train_control: true
+      train_planner: true
+      train_control: false
       temperature: 1.0
       
 
@@ -55,26 +57,26 @@ RL:
   SLACK_REWARD: -0.01
 
   TRAJECTORY_DATASET:
-    # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange"
-    trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy"
-    files_per_load: 2
+    trajectory_dir: ["/srv/flash1/xhuang394/share_demos/rearrange_open_2", "/srv/flash1/xhuang394/share_demos/rearrange"]
+    dataset_size: 500
+    files_per_load: 5
     queue_size: 1
 
-
-    steps_to_reload: 5000
-    trajs_per_file: 10
-
+  VALIDATION_DATASET:
+    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange_easy_eval"
+    dataset_size: -1
+    files_per_load: 5
+    queue_size: 1
 
   TRANSFORMER:
-    lr: 1.0E-5
+    lr: 5.0E-5
     eps: 1.0E-5
     grad_norm_clip: 0.5
     use_linear_lr_decay: True
     batch_size: 50
     num_workers: 2
 
-
-
+    warmup_updates: 200
 
     return_to_go: 100
     context_length: 30
@@ -82,7 +84,7 @@ RL:
     # model_type: "reward_conditioned"
     model_type: "bc"
     n_head: 8
-    n_layer: 6
+    n_layer: 2
     freeze_layer: [] #
     reg_flags: 
       outer_dropout: true
@@ -104,7 +106,7 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: "data/ckpts/npnp_25k_seq_offline/ckpt.1.pth" #
+    pretrained_weights: "data/ckpts/rearrange_test_13/ckpt.12.pth" #
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights
@@ -120,5 +122,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "only_planner"
-  GROUP: "trfm_easy_test"
+  RUN_NAME: "rearrange_test_17"
+  GROUP: "trfm_rearrange_test"

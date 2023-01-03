@@ -35,13 +35,18 @@ def read_dataset(
         "wait": -1,
     }
 
-    path = config.trajectory_dir
+    paths = config.trajectory_dir
     dataset_size = config.dataset_size
-    if dataset_size != -1:
-        filenames = os.listdir(path)[:dataset_size]
-    else:
-        filenames = os.listdir(path)
-    # filenames = ['{}.pt'.format(i*10) for i in range(1,51)]
+    if not isinstance(paths, list):
+        paths = [paths]
+    filenames = []
+    for path in paths:
+        if dataset_size != -1:
+            filenames_folder = os.listdir(path)[:dataset_size]
+        else:
+            filenames_folder = os.listdir(path)
+        filenames_folder = [os.path.join(path, filenames_folder[i]) for i in range(len(filenames_folder))]
+        filenames.extend(filenames_folder)
 
     if verbose:
         logger.info("Trajectory Files: {}".format(filenames))
@@ -54,7 +59,7 @@ def read_dataset(
         i = transitions_per_buffer[buffer_num]
         if verbose:
             logger.info("Loading from buffer {}".format(buffer_num, i))
-        file = os.path.join(path, filenames[buffer_num])
+        file = filenames[buffer_num]
         try:
             file = os.readlink(file)
             # print('symbol link', file)
@@ -248,6 +253,9 @@ def read_dataset(
             # for i in range(len(temp_obs)):
             #     if temp_obs[i]['skill'] != 3:
             #         temp_obs[i]['skill'] = int(temp_obs[i]['is_holding'])
+            
+                # temp_obs[i].pop("all_predicates", None)
+
 
             obss += [temp_obs]
             actions += [temp_actions]
