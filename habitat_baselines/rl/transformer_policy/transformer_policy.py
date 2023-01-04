@@ -232,16 +232,16 @@ class TransformerResNetPolicy(NetPolicy):
 
         holding_mask = (
             self.holding_mask != observations["is_holding"].reshape(B)
-        ) & (self.net.cur_skill != 3)
+        ) & (self.net.cur_skill_all != 3)
         self.holding_mask = observations["is_holding"].reshape(B)
 
         self.reset_mask = self.reset_mask | holding_mask | self.net.reset_mask
         self._reset_arm(
             observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
         )
-        self._back_up(
-            observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
-        )
+        # self._back_up(
+        #     observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
+        # )
 
         action[:,7] = 1
         self.gripper_action = action[:,7]        
@@ -404,7 +404,7 @@ class TransformerResNetPolicy(NetPolicy):
                         "loss_skill_3": loss_p_2.detach().item(),
                     }
                 )
-            # loss = loss + loss_p
+            loss = loss + loss_p
 
         if self.train_control:
 
@@ -524,7 +524,7 @@ class TransformerResNetPolicy(NetPolicy):
         policy_infos = []
         for i, info in enumerate(infos):
             policy_info = {
-                "cur_skill": self.net.cur_skill[i],
+                "cur_skill": self.net.cur_skill_all[i],
                 "reset_arm": self.reset_mask[i],
                 "gripper": self.gripper_action[i],
                 "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3]),
@@ -571,7 +571,10 @@ class TransformerResNetPolicy(NetPolicy):
         )
 
         prev_actions[self.reset_mask, :7] = delta[self.reset_mask]
+        # prev_actions[self.reset_mask, 8:10] = 0
 
+        self.net.timeout[self.reset_mask] -= 1
+        
         self.reset_mask = self.reset_mask & ~(
             torch.abs(current_joint_pos - self._target).max(-1)[0] < 5e-2
         )
@@ -821,8 +824,6 @@ class TransformerResnetNet(nn.Module):
         x = torch.cat(x, dim=1)
         x = x.reshape(B, -1, *x.shape[1:])
 
-        # breakpoint()
-
         if offline_training:
             # Move valid state-action-reward pair to the left
             out2 = self.planner_encoder(x)
@@ -865,19 +866,10 @@ class TransformerResnetNet(nn.Module):
             rnn_hidden_states[..., :-obs_dim],
         )
         self.predicted_dist = predicted_dist[torch.arange(B), current_context]
-        self.predicted_skill3 = out[torch.arange(B), current_context, 5:7]
+        self.predicted_skill3 = torch.softmax(out[torch.arange(B), current_context, 5:7], dim=-1)
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
         ] = torch.argmax(out[torch.arange(B), current_context, :5], dim=-1).float()
-
-
-        # HACK
-        mask = rnn_hidden_states[
-            torch.arange(B), current_context, -obs_dim
-        ] == 1
-        rnn_hidden_states[
-            mask, current_context, -obs_dim
-        ] += 2 * torch.argmax(out[torch.arange(B), current_context, 5:7], dim=-1).float()
 
         if not hasattr(self, "cur_skill"):
             self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)
@@ -887,11 +879,11 @@ class TransformerResnetNet(nn.Module):
         
         self.timeout *= masks.view(-1)
         
-        mask = rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == self.cur_skill
+        mask = (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == self.cur_skill) | (self.cur_skill == 5)
         self.timeout[mask] += 1
         self.timeout[~mask] = 0
-
-        if self.timeout[0] > 150 and (self.cur_skill[0] == 1 or self.cur_skill[0] == 2 or self.cur_skill[0] == 3):
+        
+        if self.timeout[0] > 250 and (self.cur_skill[0] == 1 or self.cur_skill[0] == 2 or self.cur_skill[0] == 3):
             prob = torch.softmax(out[torch.arange(B), current_context], dim=-1).cpu().numpy()
             prob[0,:4] = 0.25
             prob[0,4:] = 0
@@ -899,13 +891,46 @@ class TransformerResnetNet(nn.Module):
             rnn_hidden_states[
                 torch.arange(B), current_context, -obs_dim
             ] = select
+            # rnn_hidden_states[
+            #     torch.arange(B), current_context, -obs_dim
+            # ] = 5
 
         self.reset_mask = (
             rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
             != self.cur_skill
-        ) & (self.cur_skill != 0)
+        ) & (self.cur_skill != 3) & (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] != 3)
+
+        if self.timeout[0] > 250 and (self.cur_skill[0] == 1 or self.cur_skill[0] == 2 or self.cur_skill[0] == 3):
+            self.reset_mask[0] = True
 
         self.cur_skill = rnn_hidden_states[
+            torch.arange(B), current_context, -obs_dim
+        ]
+        
+        # HACK
+        mask = rnn_hidden_states[
+            torch.arange(B), current_context, -obs_dim
+        ] == 1
+        rnn_hidden_states[
+            mask, current_context, -obs_dim
+        ] += 2 * (
+                (self.predicted_skill3[:,1] > 0.25) & (observations["obj_start_gps_compass"][:,0] < 2)
+            ).float()   
+        # torch.argmax(self.predicted_skill3, dim=-1)
+        # rnn_hidden_states[
+        #     mask, current_context, -obs_dim
+        # ] += 2 * (
+        #         torch.from_numpy(np.array([np.random.choice(np.arange(2), p=self.predicted_skill3.cpu().numpy()[0])])).cuda()
+        #          & (observations["obj_start_gps_compass"][:,0] < 2)
+        #     ).float()
+        # 2 * torch.argmax(out[torch.arange(B), current_context, 5:7], dim=-1).float()
+
+        # if self.timeout[0] > 10 and (self.cur_skill[0] == 5):
+        #     rnn_hidden_states[
+        #         torch.arange(B), current_context, -obs_dim
+        #     ] = 5
+
+        self.cur_skill_all = rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
         ]
 
