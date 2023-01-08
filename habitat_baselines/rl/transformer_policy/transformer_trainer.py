@@ -379,7 +379,7 @@ class TransformerTrainer(BaseRLTrainer):
             checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
         )
 
-        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 4:
+        if len(os.listdir(self.config.CHECKPOINT_FOLDER)) > 17:
             fn = os.listdir(self.config.CHECKPOINT_FOLDER)
             fn = [
                 int(f.split(".")[1])
@@ -539,7 +539,7 @@ class TransformerTrainer(BaseRLTrainer):
             (self.num_updates_done % self.config.TEST_INTERVAL == 0)
             and not self.evaluated
         )
-        self.transformer_policy.train(is_train)
+        self.transformer_policy.train(True) #is_train
 
         if is_train:
             pbar = tqdm(enumerate(self.train_loader))
@@ -715,8 +715,8 @@ class TransformerTrainer(BaseRLTrainer):
                         "train", epoch_num=self.num_updates_done
                     )
                 for k in loss:
-                    torch.distributed.all_reduce(loss[k]) / 2
-                    loss[k] = loss[k].cpu().item()
+                    torch.distributed.all_reduce(loss[k])
+                    loss[k] = loss[k].cpu().item() / 4
                 if is_train:
                     self._training_log(writer, loss, prev_time)
                     self.num_updates_done += 1
@@ -737,8 +737,6 @@ class TransformerTrainer(BaseRLTrainer):
                     count_checkpoints += 1
 
                 profiling_wrapper.range_pop()  # train update
-
-        self.eval()
 
     def _eval_checkpoint(
         self,
@@ -893,6 +891,7 @@ class TransformerTrainer(BaseRLTrainer):
 
         first_nav_success_counter_temp = {}
         second_nav_success_counter_temp = {}
+        envs_to_pause_list = []
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
             and self.envs.num_envs > 0
@@ -911,6 +910,7 @@ class TransformerTrainer(BaseRLTrainer):
                     prev_actions,
                     not_done_masks,
                     deterministic=True,
+                    envs_to_pause=envs_to_pause_list,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore
@@ -990,6 +990,7 @@ class TransformerTrainer(BaseRLTrainer):
                     == evals_per_ep
                 ):
                     envs_to_pause.append(i)
+                    envs_to_pause_list.append(i)
 
                 if len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
@@ -1054,13 +1055,13 @@ class TransformerTrainer(BaseRLTrainer):
                     #     "\n\nSuccess Rate: ",
                     #     aggregated_stats["composite_success"],
                     # )
-                    print(
-                        "Nav Success: ",
-                        sum(first_nav_success_counter_temp.values())
-                        / len(first_nav_success_counter_temp.values())
-                        if len(first_nav_success_counter_temp) > 0
-                        else 0,
-                    )
+                    # print(
+                    #     "Nav Success: ",
+                    #     sum(first_nav_success_counter_temp.values())
+                    #     / len(first_nav_success_counter_temp.values())
+                    #     if len(first_nav_success_counter_temp) > 0
+                    #     else 0,
+                    # )
                     first_nav_success = (
                         sum(first_nav_success_counter_temp.values())
                         / len(first_nav_success_counter_temp.values())
@@ -1089,8 +1090,11 @@ class TransformerTrainer(BaseRLTrainer):
                         writer.add_scalar(
                             f"success_rate_metrics/{k}", v, num_episodes
                         )
-                    for k, v in aggregated_stats.items():
-                        print(f"Average episode {k}: {v:.4f}")
+                    if num_episodes % 10 == 0:
+                        for k, v in aggregated_stats.items():
+                            print(f"Average episode {k}: {v:.4f}")
+                        for k, v in metrics.items():
+                            print(f"Average episode {k}: {v:.4f}")
 
                     metrics = {
                         k: v
@@ -1170,5 +1174,34 @@ class TransformerTrainer(BaseRLTrainer):
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
+
+        first_nav_success = (
+            sum(first_nav_success_counter_temp.values())
+            / len(first_nav_success_counter_temp.values())
+            if len(first_nav_success_counter_temp) > 0
+            else 0
+        )
+        second_nav_success = (
+            sum(second_nav_success_counter_temp.values())
+            / len(second_nav_success_counter_temp.values())
+            if len(second_nav_success_counter_temp) > 0
+            else 0
+        )
+        pick_success = aggregated_stats[
+            "composite_stage_goals.stage_0_5_success"
+        ]
+        place_success = aggregated_stats[
+            "composite_stage_goals.stage_1_success"
+        ]
+        metrics = {
+            "first_nav_success": first_nav_success,
+            "pick_success": pick_success / first_nav_success if first_nav_success != 0 else 0,
+            "second_nav_success": second_nav_success / pick_success if pick_success != 0 else 0,
+            "place_success": place_success / second_nav_success if second_nav_success != 0 else 0,
+        }
+        for k, v in metrics.items():
+            writer.add_scalar(
+                f"success_rate_metrics/{k}", v, step_id
+            )
 
         self.envs.close()

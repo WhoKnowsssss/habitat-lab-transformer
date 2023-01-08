@@ -103,7 +103,7 @@ class BaseTrainer:
             self.config = resume_state["config"]
             prev_ckpt_ind = resume_state["prev_ckpt_ind"]
         else:
-            prev_ckpt_ind = -2
+            prev_ckpt_ind = -1
 
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)
@@ -155,7 +155,7 @@ class BaseTrainer:
                         )
                         time.sleep(2)  # sleep for 2 secs before polling again
                     logger.info(f"=======current_ckpt: {current_ckpt}=======")  # type: ignore
-                    prev_ckpt_ind += 1
+                    prev_ckpt_ind += 2
                     self._eval_checkpoint(
                         checkpoint_path=current_ckpt,
                         writer=writer,

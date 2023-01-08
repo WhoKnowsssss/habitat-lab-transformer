@@ -392,7 +392,8 @@ def poll_checkpoint_folder(
     ind = previous_ckpt_ind + 1
     if ind < len(models_paths):
         return models_paths[ind]
-    return None
+    # return None
+    return models_paths[-1]
 
 
 def generate_video(

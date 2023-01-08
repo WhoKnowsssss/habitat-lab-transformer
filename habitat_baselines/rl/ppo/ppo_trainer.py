@@ -1254,7 +1254,7 @@ class PPOTrainer(BaseRLTrainer):
                             % self.config.DATASET_SAVE_INTERVAL
                             == 0
                         ):
-                            flush_episodes()
+                            # flush_episodes()
                             all_obs = []
                             all_rewards = []
                             all_masks = []

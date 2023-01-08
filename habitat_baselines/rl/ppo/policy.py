@@ -137,9 +137,10 @@ class NetPolicy(nn.Module, Policy):
         prev_actions,
         masks,
         deterministic=False,
+        envs_to_pause=None,
     ):
         features, rnn_hidden_states, _ = self.net(
-            observations, rnn_hidden_states, prev_actions, masks
+            observations, rnn_hidden_states, prev_actions, masks, #envs_to_pause=envs_to_pause
         )
         distribution = self.action_distribution(features)
         value = self.critic(features)

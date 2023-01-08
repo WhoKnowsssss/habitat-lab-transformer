@@ -31,11 +31,15 @@ from habitat_baselines.rl.transformer_policy.transformer_model_orig import (
     GPT,
     PlannerGPT,
 )
+# from habitat_baselines.rl.transformer_policy.lstm_model import (
+#     GPTConfig,
+#     GPT,
+#     PlannerGPT,
+# )
 
 # from habitat_baselines.rl.models.rnn_state_encoder import (
 #     build_rnn_state_encoder,
 # )
-from habitat_baselines.rl.transformer_policy.pure_bc_model import LSTMBC
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.utils.common import get_num_actions
 from habitat_baselines.rl.transformer_policy.action_distribution import (
@@ -177,6 +181,7 @@ class TransformerResNetPolicy(NetPolicy):
         prev_actions,
         masks,
         deterministic=False,
+        envs_to_pause=None,
     ):
         (value, action, action_log_probs, rnn_hidden_states,) = super().act(
             observations,
@@ -184,6 +189,7 @@ class TransformerResNetPolicy(NetPolicy):
             prev_actions,
             masks,
             deterministic=deterministic,
+            envs_to_pause=envs_to_pause,
         )
         action = action.float()
         if self.action_distribution_type == "mixed":
@@ -227,21 +233,30 @@ class TransformerResNetPolicy(NetPolicy):
                 (B, 7), dtype=torch.float, device=rnn_hidden_states.device
             )
 
+        state_index = list(range(self.reset_mask.shape[0]))
+        if envs_to_pause is not None: 
+            envs_to_pause.sort()
+            for idx in reversed(envs_to_pause):
+                state_index.pop(idx)
+        
         holding_mask = (
-            self.holding_mask != observations["is_holding"].reshape(B)
-        ) & (self.net.cur_skill != 3)
-        self.holding_mask = observations["is_holding"].reshape(B)
+            self.holding_mask[state_index] != observations["is_holding"].reshape(B)
+        ) & (self.net.cur_skill[state_index] != 3) #BCHACK
+        self.holding_mask[state_index] = observations["is_holding"].reshape(B).bool()
 
-        self.reset_mask = self.reset_mask | holding_mask | self.net.reset_mask
+        self.reset_mask[state_index] = self.reset_mask[state_index] | holding_mask | self.net.reset_mask[state_index]
         self._reset_arm(
-            observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
+            observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask[state_index], state_index
         )
         # self._back_up(
         #     observations, action, rnn_hidden_states, holding_mask | self.net.reset_mask
         # )
 
-        action[:,7] = 1
+        action[:,7] = -2 * (torch.norm(observations["obj_goal_sensor"], dim=-1) < 0.29) * observations["is_holding"].reshape(B) + 1
+        # action[:,7] = 1
+        mask = action[:, 7] == -1
         self.gripper_action = action[:,7]
+        action[:,-1] = mask.float()
 
         return (
             value,
@@ -469,7 +484,7 @@ class TransformerResNetPolicy(NetPolicy):
         return self.net.hidden_state_hxs_dim
 
     def _reset_arm(
-        self, observations, prev_actions, rnn_hidden_states, reset_mask
+        self, observations, prev_actions, rnn_hidden_states, reset_mask, state_index
     ):
         self._target = torch.tensor(
             [
@@ -483,9 +498,7 @@ class TransformerResNetPolicy(NetPolicy):
             ],
             device=rnn_hidden_states.device,
         )
-        self._initial_delta[reset_mask] = (
-            self._target - observations["joint"]
-        )[reset_mask]
+        self._initial_delta[state_index] = (self._target - observations["joint"]) * reset_mask.reshape(-1,1) + self._initial_delta[state_index] * (~reset_mask).reshape(-1,1)
 
         current_joint_pos = observations["joint"]
         delta = self._target - current_joint_pos
@@ -494,18 +507,18 @@ class TransformerResNetPolicy(NetPolicy):
         # always in [-1,1] and has the benefit of reducing the delta
         # amount was we converge to the target.
         delta = delta / torch.maximum(
-            self._initial_delta.max(-1, keepdims=True)[0],
+            self._initial_delta[state_index].max(-1, keepdims=True)[0],
             torch.tensor(1e-5, device=rnn_hidden_states.device),
         )
 
-        prev_actions[self.reset_mask, :7] = delta[self.reset_mask]
+        prev_actions[self.reset_mask[state_index], :7] = delta[self.reset_mask[state_index]]
 
-        self.reset_mask = self.reset_mask & ~(
+        self.reset_mask[state_index] = self.reset_mask[state_index] & ~(
             torch.abs(current_joint_pos - self._target).max(-1)[0] < 5e-2
         )
 
 
-    def _back_up(self, observations, prev_actions, rnn_hidden_states, reset_mask
+    def _back_up(self, observations, prev_actions, rnn_hidden_states, reset_mask, state_index
     ):
         if self.net.timeout[0] > 100 and (self.net.cur_skill[0] == 0 or self.net.cur_skill[0] == 4):
             prev_actions[0, 8:10] = torch.tensor([-1, 0]).cuda()
@@ -717,6 +730,7 @@ class TransformerResnetNet(nn.Module):
         rtgs=None,
         # timesteps=None,
         offline_training=False,
+        envs_to_pause=None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         x = []
@@ -811,27 +825,32 @@ class TransformerResnetNet(nn.Module):
         if not hasattr(self, "timeout"):
             self.timeout = torch.zeros(B, device=rnn_hidden_states.device)
 
-        self.timeout *= masks.view(-1)
+        if not hasattr(self, "reset_mask"):
+            self.reset_mask = torch.zeros(B, dtype=torch.bool, device=rnn_hidden_states.device)
+
+        state_index = list(range(self.timeout.shape[0]))
+        if envs_to_pause is not None: 
+            envs_to_pause.sort()
+            for idx in reversed(envs_to_pause):
+                state_index.pop(idx)
         
-        mask = rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == self.cur_skill
-        self.timeout[mask] += 1
-        self.timeout[~mask] = 0
+        self.timeout[state_index] *= masks.view(-1)
+        
+        mask = rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == self.cur_skill[state_index]
+        self.timeout[state_index] += mask.float()
+        self.timeout[state_index] *= mask.float()
 
-        # if self.timeout[0] > 150 and (self.cur_skill[0] == 1 or self.cur_skill[0] == 2):
-        #     prob = torch.softmax(out[torch.arange(B), current_context], dim=-1).cpu().numpy()
-        #     prob[0,:4] = 0.25
-        #     prob[0,4:] = 0
-        #     select = torch.from_numpy(np.array([np.random.choice(np.arange(10), p=prob[0])])).float().cuda()
-        #     rnn_hidden_states[
-        #         torch.arange(B), current_context, -obs_dim
-        #     ] = select
-
-        self.reset_mask = (
+        mask = self.timeout[state_index] > 150 & ((self.cur_skill[state_index] == 1) | (self.cur_skill[state_index] == 2))
+    
+        self.reset_mask[state_index] = (
             rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
-            != self.cur_skill
-        ) & (self.cur_skill != 0)
+            != self.cur_skill[state_index]
+        )# & (self.cur_skill != 0) & (self.cur_skill != 4)
+        # self.reset_mask[:] = False #BCHACK
+        
+        # self.reset_mask[mask] = True
 
-        self.cur_skill = rnn_hidden_states[
+        self.cur_skill[state_index] = rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim
         ]
 

@@ -31,7 +31,6 @@ class ActionNorm(nn.Module):
         # print(x)
         return y * self.std + self.mean
 
-
 class GPTConfig:
     """base GPT config, params common to all GPT versions"""
 
@@ -52,115 +51,6 @@ class GPT1Config(GPTConfig):
     n_layer = 12
     n_head = 12
     n_embd = 768
-
-
-class CausalSelfAttention(nn.Module):
-    """
-    A vanilla multi-head masked self-attention layer with a projection at the end.
-    It is possible to use torch.nn.MultiheadAttention here but I am including an
-    explicit implementation here to show that there is nothing too scary here.
-    """
-
-    def __init__(self, config):
-        super().__init__()
-        assert config.n_embd % config.n_head == 0
-        # key, query, value projections for all heads
-        self.key = nn.Linear(config.n_embd, config.n_embd)
-        self.query = nn.Linear(config.n_embd, config.n_embd)
-        self.value = nn.Linear(config.n_embd, config.n_embd)
-        # regularization
-        if config.reg_flags['attention_dropout']:
-            self.attn_drop = nn.Dropout(config.attn_pdrop)
-            self.resid_drop = nn.Dropout(config.resid_pdrop)
-        # output projection
-        self.proj = nn.Linear(config.n_embd, config.n_embd)
-        # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.register_buffer(
-            "mask",
-            torch.tril(torch.ones(config.block_size, config.block_size)).view(
-                1, 1, config.block_size, config.block_size
-            ),
-        )
-        self.n_head = config.n_head
-
-    def forward(self, x, layer_past=None):
-        B, T, C = x.size()
-
-        # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        k = (
-            self.key(x)
-            .view(B, T, self.n_head, C // self.n_head)
-            .transpose(1, 2)
-        )  # (B, nh, T, hs)
-        q = (
-            self.query(x)
-            .view(B, T, self.n_head, C // self.n_head)
-            .transpose(1, 2)
-        )  # (B, nh, T, hs)
-        v = (
-            self.value(x)
-            .view(B, T, self.n_head, C // self.n_head)
-            .transpose(1, 2)
-        )  # (B, nh, T, hs)
-
-        # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float("-inf"))
-        # if attention_mask is not None:
-        #     att = att.masked_fill(attention_mask.repeat(T,self.n_head,1,1).transpose(0,2) == 0, float('-inf'))
-        att = F.softmax(att, dim=-1)
-
-        if hasattr(self, 'attn_drop'):
-            att = self.attn_drop(att)
-        y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        y = (
-            y.transpose(1, 2).contiguous().view(B, T, C)
-        )  # re-assemble all head outputs side by side
-
-        # output projection
-        if hasattr(self, 'resid_drop'):
-            y = self.resid_drop(self.proj(y))
-        else:
-            y = self.proj(y)
-        return y
-
-
-class Block(nn.Module):
-    """an unassuming Transformer block"""
-
-    def __init__(self, config):
-        super().__init__()
-        if config.reg_flags['attention_layernorm']:
-            self.ln1 = nn.LayerNorm(config.n_embd)
-        if config.reg_flags['feedforward_layernorm']:
-            self.ln2 = nn.LayerNorm(config.n_embd)
-        self.attn = CausalSelfAttention(config)
-        if config.reg_flags['feedforward_dropout']:
-            self.mlp = nn.Sequential(
-                nn.Linear(config.n_embd, 4 * config.n_embd),
-                GELU(),
-                nn.Linear(4 * config.n_embd, config.n_embd),
-                nn.Dropout(config.resid_pdrop),
-            )
-        else:
-            self.mlp = nn.Sequential(
-                nn.Linear(config.n_embd, 4 * config.n_embd),
-                GELU(),
-                nn.Linear(4 * config.n_embd, config.n_embd),
-            )
-        
-
-    def forward(self, x):
-        if hasattr(self, 'ln1'):
-            x = x + self.attn(self.ln1(x))
-        else:
-            x = x + self.attn(x)
-        if hasattr(self, 'ln2'):
-            x = x + self.mlp(self.ln2(x))
-        else:
-            x = x + self.mlp(x)
-        
-        return x
 
 
 class GPT(nn.Module):
@@ -194,9 +84,7 @@ class GPT(nn.Module):
             self.drop = nn.Dropout(config.embd_pdrop)
 
         # transformer
-        self.blocks = nn.Sequential(
-            *[Block(config) for _ in range(config.n_layer)]
-        )
+        self.blocks = nn.LSTM(config.n_embd, config.n_embd, config.n_layer, batch_first=True)
 
         # decoder head
         if self.reg_flags['outer_layernorm']:
@@ -454,11 +342,8 @@ class GPT(nn.Module):
         # position_embeddings = torch.gather(all_global_pos_emb, 1, torch.repeat_interleave(timesteps, self.config.n_embd, dim=-1)) + self.pos_emb[:, :token_embeddings.shape[1], :]
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
         x = token_embeddings + position_embeddings
-        if self.reg_flags['outer_dropout']:
-            x = self.drop(x)
-        x = self.blocks(x)
-        if self.reg_flags['outer_layernorm']:
-            x = self.ln_f(x)
+
+        x = self.blocks(x)[0]
 
         if actions is not None and self.model_type == "reward_conditioned":
             return x[:, (self.num_inputs - 2) :: (self.num_inputs), :]
@@ -497,9 +382,7 @@ class PlannerGPT(nn.Module):
         self.drop = nn.Dropout(config.embd_pdrop)
 
         # transformer
-        self.blocks = nn.Sequential(
-            *[Block(config) for _ in range(config.n_layer)]
-        )
+        self.blocks = nn.LSTM(config.n_embd, config.n_embd, config.n_layer, batch_first=True)
 
         # decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
@@ -565,7 +448,7 @@ class PlannerGPT(nn.Module):
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
 
         x = self.drop(token_embeddings + position_embeddings)
-        x = self.blocks(x)
+        x = self.blocks(x)[0]
         x = self.ln_f(x)
 
         return self.output_head(x), self.output_head2(x)
