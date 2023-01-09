@@ -1,6 +1,6 @@
 VERBOSE: False
 BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
-TRAINER_NAME: "ver"
+TRAINER_NAME: "ppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ["disk"]
@@ -31,24 +31,24 @@ RL:
   POLICY:
       name: "TransformerResNetPolicy"
       action_distribution_type: "mixed"
-      include_visual_keys: ["robot_head_depth"]
       ACTION_DIST:
-        discrete_arm: true
+        discrete_arm: false
         discrete_base: false
         use_std_param: true
         temperature: 1.0
       use_rgb: false
       offline: false
+      include_visual_keys: ["robot_head_depth"]
       train_planner: true
       train_control: true
-
+      temperature: 1.0
   TRANSFORMER:
     return_to_go: 100
-    context_length: 30 #10
+    context_length: 30
     model_type: "bc"
     n_head: 8
-    n_layer: 6
-    freeze_layer: [0,1,2,3] #
+    n_layer: 2
+    freeze_layer: [] #
     reg_flags: 
       outer_dropout: false
       outer_layernorm: true
