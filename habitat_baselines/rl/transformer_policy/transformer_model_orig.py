@@ -221,7 +221,8 @@ class GPT(nn.Module):
                 ]
             )
 
-        # self.ret_emb = nn.Sequential(nn.Linear(1, config.n_embd), nn.Tanh())
+        if self.model_type == "reward_conditioned":
+            self.ret_emb = nn.Sequential(nn.Linear(1, config.n_embd), nn.Tanh())
 
         self.action_embeddings = nn.Sequential(
             nn.Linear(config.vocab_size, config.n_embd), nn.Tanh()
@@ -351,10 +352,10 @@ class GPT(nn.Module):
         if actions is not None and self.model_type == "reward_conditioned":
             rtg_embeddings = self.ret_emb(rtgs.type(torch.float32))
             actions = torch.clone(actions)
-            actions[:, :, :7] = (
-                torch.bucketize(actions[:, :, :7], self.boundaries) - 1
-            ) / 10
-            actions[:, :, [10]] = 0
+            # actions[:, :, :7] = (
+            #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
+            # ) / 10 * 2 - 1
+            actions[:,:,[10]] = 0
             actions = actions.type(torch.float32)
             # targets = torch.bucketize(targets[:,:,:], self.boundaries) - 1
             # if actions.shape[-1] == 12:

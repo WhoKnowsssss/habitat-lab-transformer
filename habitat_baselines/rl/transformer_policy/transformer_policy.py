@@ -553,7 +553,7 @@ class TransformerResnetNet(nn.Module):
     ):
         super().__init__()
         self.context_length = context_length
-        context_length = 30
+        # context_length = 30
 
         self.discrete_actions = discrete_actions
         if discrete_actions:
@@ -811,13 +811,20 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -obs_dim
         ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
 
-
+        # # HACK
+        # mask1 = observations["is_holding"].reshape(-1)
         # mask = rnn_hidden_states[
         #     torch.arange(B), current_context, -obs_dim
         # ] == 1
         # rnn_hidden_states[
-        #     mask, current_context, -obs_dim
-        # ] = 3
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = mask * mask1 * 1 + rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
+        # mask = rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] == 0
+        # rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = mask * mask1 * 4 + rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
 
         if not hasattr(self, "cur_skill"):
             self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)

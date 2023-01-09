@@ -58,6 +58,8 @@ class StripsHighLevelPolicy(HighLevelPolicy):
 
         if obj_in_recep is not None:
             sol_actions.insert(1, get_recep_ac(obj_in_recep, "goal0|0"))
+            if 'open_cab' in sol_actions[1]:
+                sol_actions[2] = 'pick_offset' + sol_actions[2].split('pick')[-1]
         if goal_in_recep is not None:
             sol_actions.insert(
                 # Must add relative to the end in case we added an open after the first nav.

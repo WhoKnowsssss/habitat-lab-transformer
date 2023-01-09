@@ -69,8 +69,8 @@ class TargetCurrentSensor(UsesRobotInterface, MultiObjSensor):
         scene_pos = self._sim.get_scene_pos()
         pos = scene_pos[idxs]
 
-        for i in range(pos.shape[0]):
-            pos[i] = T_inv.transform_point(pos[i])
+        # for i in range(pos.shape[0]):
+        #     pos[i] = T_inv.transform_point(pos[i])
 
         return pos.reshape(-1)
 
@@ -88,6 +88,23 @@ class TargetStartSensor(UsesRobotInterface, MultiObjSensor):
         global_T = self._sim.get_robot_data(self.robot_id).robot.ee_transform
         T_inv = global_T.inverted()
         pos = self._sim.get_target_objs_start()
+        return batch_transform_point(pos, T_inv, np.float32).reshape(-1)
+
+@registry.register_sensor
+class TargetStartOffsetSensor(UsesRobotInterface, MultiObjSensor):
+    """
+    Relative position from end effector to target object
+    """
+
+    cls_uuid: str = "obj_start_offset_sensor"
+
+    def get_observation(self, *args, observations, episode, **kwargs):
+        self._sim: RearrangeSim
+        global_T = self._sim.get_robot_data(self.robot_id).robot.ee_transform
+        T_inv = global_T.inverted()
+        pos = self._sim.get_target_objs_start()
+        pos = np.copy(pos)
+        pos[0,0] += 0.5
         return batch_transform_point(pos, T_inv, np.float32).reshape(-1)
 
 

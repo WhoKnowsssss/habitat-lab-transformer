@@ -124,6 +124,8 @@ def read_dataset(
             # temp_dones = np.delete(temp_dones, stepwise_idx, 0)
 
             # ==================== Only Successful Episodes ===================
+            
+            # stepwise_idx = np.array([temp_infos[i]['success'] for i in range(len(temp_infos))])
             # stepwise_idx = np.argwhere(temp_infos == False).squeeze()
 
             # temp_obs = np.delete(temp_obs, stepwise_idx, 0)
@@ -236,6 +238,7 @@ def read_dataset(
             except:
                 continue
 
+            last_skill = None
             for i in range(len(temp_obs)):
                 if temp_obs[i]["skill"] == 0 and temp_obs[i]["is_holding"] == 1:
                     # temp_actions[i,8] = 0
@@ -243,11 +246,24 @@ def read_dataset(
             
                 if temp_obs[i]["skill"] == 4 or temp_obs[i]["skill"] == 0:
                     temp_actions[i,:7] = 0
+                
+            # ====================== Separate Dataset =========================
+            #     if last_skill is None: 
+            #         last_skill = temp_obs[i]["skill"]
+            #     else:
+            #         if last_skill != temp_obs[i]["skill"]:
+            #             temp_dones[i-1] = False
+            #         last_skill = temp_obs[i]["skill"]
+
+            # temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
+                
 
 
             # for i in range(len(temp_obs)):
             #     if temp_obs[i]['skill'] != 3:
             #         temp_obs[i]['skill'] = int(temp_obs[i]['is_holding'])
+
+
 
             obss += [temp_obs]
             actions += [temp_actions]
@@ -292,6 +308,7 @@ def _timesteps_rtg(done_idxs, stepwise_returns):
             rtg[j + start] = np.sum(curr_traj_returns[j:])
 
         timesteps[start:done] = np.arange(done - start)
+
     return rtg, timesteps
 
 
