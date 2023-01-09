@@ -6,7 +6,7 @@ TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
 # VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/rearrange_test_20_11"
+VIDEO_DIR: "video_dir/rearrange_test_1"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -14,11 +14,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_test_20"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_test_1"
 NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/rearrange_test_20"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_test_1"
 NUM_UPDATES: 800
 TEST_INTERVAL: 20
 TOTAL_NUM_STEPS: -1.0
@@ -57,8 +57,8 @@ RL:
   SLACK_REWARD: -0.01
 
   TRAJECTORY_DATASET:
-    trajectory_dir: ["/srv/flash1/xhuang394/share_demos/rearrange_open_2", "/srv/flash1/xhuang394/share_demos/rearrange"]
-    dataset_size: 5000
+    trajectory_dir: ["/srv/flash1/xhuang394/share_demos/rearrange_open"]
+    dataset_size: 10000
     files_per_load: 5
     queue_size: 1
 
@@ -69,11 +69,11 @@ RL:
     queue_size: 1
 
   TRANSFORMER:
-    lr: 5.0E-5
+    lr: 6.0E-5
     eps: 1.0E-5
     grad_norm_clip: 0.5
     use_linear_lr_decay: True
-    batch_size: 115
+    batch_size: 230
     num_workers: 2
 
     warmup_updates: 200
@@ -122,5 +122,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "rearrange_test_20"
+  RUN_NAME: "rearrange_test_1"
   GROUP: "trfm_rearrange_test"

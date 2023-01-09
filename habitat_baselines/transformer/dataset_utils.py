@@ -28,6 +28,7 @@ def read_dataset(
     skill_dict = {
         "nav": 0,
         "pick": 1,
+        "pick_offset": 1,
         "place": 2,
         "open_cab": 3,
         "open_fridge": 3,
@@ -249,6 +250,23 @@ def read_dataset(
                 if temp_obs[i]["skill"] == 4 or temp_obs[i]["skill"] == 0:
                     temp_actions[i,:7] = 0
 
+            # ================== Only Nav Open Successful ====================
+            # new_temp_done_idxs = [0, temp_done_idxs[0], temp_done_idxs[1]]
+            # stepwise_idx = []
+            # for idx in range(2):
+            #     success = False
+            #     for i in range(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]):
+            #         if temp_obs[i]["skill"] == 4:
+            #             success = True
+            #     if not success:
+            #         stepwise_idx.append(np.arange(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]))
+            # stepwise_idx = np.concatenate(stepwise_idx)
+            # temp_obs = np.delete(temp_obs, stepwise_idx, 0)
+            # temp_actions = np.delete(temp_actions, stepwise_idx, 0)
+            # temp_stepwise_returns = np.delete(temp_stepwise_returns, stepwise_idx, 0)
+            # temp_dones = np.delete(temp_dones, stepwise_idx, 0)
+
+            # temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
 
             # for i in range(len(temp_obs)):
             #     if temp_obs[i]['skill'] != 3:
