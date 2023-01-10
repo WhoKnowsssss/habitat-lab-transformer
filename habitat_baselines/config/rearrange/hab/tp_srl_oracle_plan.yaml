@@ -171,7 +171,7 @@ RL:
           OBS_SKILL_INPUTS: ["obj_start_sensor"]
           LOAD_CKPT_FILE: "data/models/pick.pth"
           MAX_SKILL_STEPS: 200
-          FORCE_END_ON_TIMEOUT: False
+          FORCE_END_ON_TIMEOUT: True
 
       USE_SKILLS:
         # Uncomment if you are also using these skills

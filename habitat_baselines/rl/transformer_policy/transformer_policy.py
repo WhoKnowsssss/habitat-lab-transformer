@@ -182,6 +182,7 @@ class TransformerResNetPolicy(NetPolicy):
         masks,
         deterministic=False,
         envs_to_pause=None,
+        rtgs=None,
     ):
         (value, action, action_log_probs, rnn_hidden_states,) = super().act(
             observations,
@@ -190,6 +191,7 @@ class TransformerResNetPolicy(NetPolicy):
             masks,
             deterministic=deterministic,
             envs_to_pause=envs_to_pause,
+            rtgs=rtgs,
         )
         action = action.float()
         if self.action_distribution_type == "mixed":
@@ -861,12 +863,18 @@ class TransformerResnetNet(nn.Module):
             torch.arange(B), current_context, -obs_dim
         ]
 
+        if rtgs is not None:
+            rnn_hidden_states[
+                torch.arange(B), current_context, -obs_dim:-obs_dim+1
+            ] = rtgs.cuda()
+            rtgs = rnn_hidden_states[..., -obs_dim:-obs_dim+1]
+
         rnn_hidden_states = rnn_hidden_states.contiguous()
 
         out = self.state_encoder(
             rnn_hidden_states[..., :-action_dim],
             rnn_hidden_states[..., -action_dim:],
-            rtgs=None,
+            rtgs=rtgs,
         )
 
         return out[torch.arange(B), current_context], rnn_hidden_states, {}

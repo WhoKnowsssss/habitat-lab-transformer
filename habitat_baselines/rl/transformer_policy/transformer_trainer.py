@@ -898,6 +898,10 @@ class TransformerTrainer(BaseRLTrainer):
         ):
             current_episodes_info = self.envs.current_episodes()
 
+            if self.config.RL.TRANSFORMER.model_type == "reward_conditioned":
+                rtgs = self.config.RL.TRANSFORMER.return_to_go - current_episode_reward
+            else:
+                rtgs = None
             with torch.inference_mode():
                 (
                     _,
@@ -911,6 +915,7 @@ class TransformerTrainer(BaseRLTrainer):
                     not_done_masks,
                     deterministic=True,
                     envs_to_pause=envs_to_pause_list,
+                    rtgs=rtgs,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore

@@ -138,10 +138,11 @@ class NetPolicy(nn.Module, Policy):
         masks,
         deterministic=False,
         envs_to_pause=None,
+        rtgs=None,
     ):
         if envs_to_pause is not None:
             features, rnn_hidden_states, _ = self.net(
-                observations, rnn_hidden_states, prev_actions, masks, envs_to_pause=envs_to_pause
+                observations, rnn_hidden_states, prev_actions, masks, envs_to_pause=envs_to_pause, rtgs=rtgs,
             )
         else:
             features, rnn_hidden_states, _ = self.net(
