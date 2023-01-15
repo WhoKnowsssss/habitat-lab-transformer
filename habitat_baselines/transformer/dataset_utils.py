@@ -28,10 +28,10 @@ def read_dataset(
     skill_dict = {
         "nav": 0,
         "pick": 1,
-        "pick_offset": 1,
+        "pick_offset": 3,
         "place": 2,
-        "open_cab": 3,
-        "open_fridge": 3,
+        "open_cab": 5,
+        "open_fridge": 5,
         "reset_arm": -1,
         "wait": -1,
     }
@@ -71,7 +71,11 @@ def read_dataset(
             import time
 
             s = time.perf_counter()
-            dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            try:
+                dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            except Exception as e:
+                print("skip", e)
+                continue
             # print("dataset load time", time.perf_counter() - s)
 
             temp_obs = np.array(dataset_raw["obs"])
@@ -146,31 +150,6 @@ def read_dataset(
                 )
                 continue
 
-            # ==================== Only Episodes that are larger than context_length ===================
-            temp_start_idxs = np.roll(temp_done_idxs, 1)
-            temp_start_idxs[0] = 0
-
-            idx = np.nonzero(
-                temp_done_idxs[:] - temp_start_idxs[:] < context_length
-            )[0]
-            if len(idx) > 0:
-
-                stepwise_idx = np.concatenate(
-                    [
-                        np.arange(temp_start_idxs[i], temp_done_idxs[i])
-                        for i in idx
-                    ]
-                )
-
-                temp_obs = np.delete(temp_obs, stepwise_idx, 0)
-                temp_actions = np.delete(temp_actions, stepwise_idx, 0)
-                temp_stepwise_returns = np.delete(
-                    temp_stepwise_returns, stepwise_idx, 0
-                )
-                temp_dones = np.delete(temp_dones, stepwise_idx, 0)
-
-            temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
-
             # #==================== Categorize Gripper Action ===================
             temp_actions = np.clip(temp_actions, -1, 1)
             # temp_pick_action = temp_actions[:,7]
@@ -237,11 +216,20 @@ def read_dataset(
             try:
                 for i in range(len(temp_obs)):
                     temp_obs[i]["skill"] = skill_dict[temp_infos[i]["skill"]]
+                    temp_obs[i]["skill_control"] = temp_obs[i]["skill"]
                     if temp_obs[i]["skill"] == -1:
-                        temp_obs[i]["skill"] = temp_obs[i - 1]["skill"]
+                        if temp_obs[i - 1]["skill"] != 5:
+                            temp_obs[i]["skill"] = temp_obs[i - 1]["skill"]
+                        else:
+                            temp_obs[i]["skill"] = 3
+                        temp_obs[i]["skill_control"] = 6
+                    
+                    # =============== Learn Change =================
+                    temp_obs[i]['skill_change'] = 0
             except:
                 continue
 
+            is_nav_open = False
             for i in range(len(temp_obs)):
                 if temp_obs[i]["skill"] == 0 and temp_obs[i]["is_holding"] == 1:
                     # temp_actions[i,8] = 0
@@ -250,32 +238,104 @@ def read_dataset(
                 if temp_obs[i]["skill"] == 4 or temp_obs[i]["skill"] == 0:
                     temp_actions[i,:7] = 0
 
-            # ================== Only Nav Open Successful ====================
-            new_temp_done_idxs = [0, temp_done_idxs[0], temp_done_idxs[1]]
-            stepwise_idx = []
-            for idx in range(2):
-                success = False
-                for i in range(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]):
-                    if temp_obs[i]["skill"] == 4:
-                        success = True
-                if not success:
-                    stepwise_idx.append(np.arange(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]))
-            if len(stepwise_idx) > 0:
-                if len(stepwise_idx) == 2:
-                    continue
-                stepwise_idx = np.concatenate(stepwise_idx)
+                # =============== Learn Change =================
+                if (temp_obs[i - 1]["skill"] != 5 and temp_obs[i]["skill"] == 5) and i >= 30:
+                # if temp_obs[i]["skill"] == 5:
+                    is_nav_open = True
+                    for j in range(i+30, i-30):
+                        temp_obs[j]['skill_change'] = 1
+
+            # =============== Delete Problematic Nav Phase =================
+            if is_nav_open:
+                stepwise_idx = []
+                for i in range(len(temp_obs)):
+                    if temp_obs[i]["skill"] == 4 or temp_obs[i]["skill"] == 0:
+                        stepwise_idx.append(i)
+                stepwise_idx = np.array(stepwise_idx)
                 temp_obs = np.delete(temp_obs, stepwise_idx, 0)
                 temp_actions = np.delete(temp_actions, stepwise_idx, 0)
                 temp_stepwise_returns = np.delete(temp_stepwise_returns, stepwise_idx, 0)
                 temp_dones = np.delete(temp_dones, stepwise_idx, 0)
 
+                temp_obs = np.concatenate([temp_obs, temp_obs])
+                temp_actions = np.concatenate([temp_actions, temp_actions])
+                temp_stepwise_returns = np.concatenate([temp_stepwise_returns, temp_stepwise_returns])
+                temp_dones = np.concatenate([temp_dones, temp_dones])
+
                 temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
+
+
+            # ================== Only Nav Open Successful ====================
+            # new_temp_done_idxs = [0, temp_done_idxs[0], temp_done_idxs[1]]
+            # stepwise_idx = []
+            # for idx in range(2):
+            #     success = False
+            #     for i in range(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]):
+            #         if temp_obs[i]["skill"] == 4:
+            #             success = True
+            #     if not success:
+            #         stepwise_idx.append(np.arange(new_temp_done_idxs[idx], new_temp_done_idxs[idx+1]))
+            # if len(stepwise_idx) > 0:
+            #     if len(stepwise_idx) == 2:
+            #         continue
+            #     stepwise_idx = np.concatenate(stepwise_idx)
+            #     temp_obs = np.delete(temp_obs, stepwise_idx, 0)
+            #     temp_actions = np.delete(temp_actions, stepwise_idx, 0)
+            #     temp_stepwise_returns = np.delete(temp_stepwise_returns, stepwise_idx, 0)
+            #     temp_dones = np.delete(temp_dones, stepwise_idx, 0)
+
+            #     temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
 
             # for i in range(len(temp_obs)):
             #     if temp_obs[i]['skill'] != 3:
             #         temp_obs[i]['skill'] = int(temp_obs[i]['is_holding'])
             
                 # temp_obs[i].pop("all_predicates", None)
+
+            # ==================== Only Episodes that are larger than context_length ===================
+            temp_start_idxs = np.roll(temp_done_idxs, 1)
+            temp_start_idxs[0] = 0
+
+            idx = np.nonzero(
+                temp_done_idxs[:] - temp_start_idxs[:] < context_length
+            )[0]
+            if len(idx) > 0:
+
+                continue
+                stepwise_idx = np.concatenate(
+                    [
+                        np.arange(temp_start_idxs[i], temp_done_idxs[i])
+                        for i in idx
+                    ]
+                )
+
+                temp_obs = np.delete(temp_obs, stepwise_idx, 0)
+                temp_actions = np.delete(temp_actions, stepwise_idx, 0)
+                temp_stepwise_returns = np.delete(
+                    temp_stepwise_returns, stepwise_idx, 0
+                )
+                temp_dones = np.delete(temp_dones, stepwise_idx, 0)
+
+            temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
+            
+            # ======================== Add Missing Keys ========================
+            if 'all_predicates' not in temp_obs[0].keys():
+                temp_missing_obs = torch.zeros((1, 47))
+                for i in range(len(temp_obs)):
+                    temp_obs[i]['all_predicates'] = temp_missing_obs[0, :35]
+                    # temp_obs[i]['abs_obj_start_sensor'] = temp_missing_obs[0, 35:38]
+                    # temp_obs[i]['ee_pos'] = temp_missing_obs[0, 38:41]
+                    # temp_obs[i]['obj_start_offset_sensor'] = temp_missing_obs[0, 41:44]
+                    # temp_obs[i]['obj_goal_pos_sensor'] = temp_missing_obs[0, 44:47]
+            if 'abs_obj_start_sensor' in temp_obs[0].keys():
+                for i in range(len(temp_obs)):
+                    try:
+                        temp_obs[i].pop('abs_obj_start_sensor')
+                        temp_obs[i].pop('ee_pos')
+                        temp_obs[i].pop('obj_start_offset_sensor')
+                        temp_obs[i].pop('obj_goal_pos_sensor')
+                    except KeyError:
+                        pass
 
 
             obss += [temp_obs]

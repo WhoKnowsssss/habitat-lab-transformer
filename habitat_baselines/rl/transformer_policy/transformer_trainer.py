@@ -164,11 +164,17 @@ class TransformerTrainer(BaseRLTrainer):
                 in pretrained_state["state_dict"].keys()
                 else ""
             )
+            pretrained_state["state_dict"] = {
+                k: pretrained_state["state_dict"][k] 
+                for k in pretrained_state["state_dict"].keys() if "plan" not in k
+            }
+
             self.transformer_policy.load_state_dict(
                 {
                     k[k.find(prefix) + len(prefix) :]: v
                     for k, v in pretrained_state["state_dict"].items()
-                }
+                },
+                strict=False, #HACK
             )
         elif self.config.RL.TRANSFORMER.pretrained_encoder:
             prefix = "net.visual_encoder."
@@ -1099,13 +1105,13 @@ class TransformerTrainer(BaseRLTrainer):
                     for k, v in aggregated_stats.items():
                         print(f"Average episode {k}: {v:.4f}")
 
-                    # metrics = {
-                    #     k: v
-                    #     for k, v in aggregated_stats.items()
-                    #     if k != "reward"
-                    # }
-                    # for k, v in metrics.items():
-                    #     writer.add_scalar(f"eval_metrics/{k}", v, num_episodes)
+                    metrics = {
+                        k: v
+                        for k, v in aggregated_stats.items()
+                        if k != "reward"
+                    }
+                    for k, v in metrics.items():
+                        writer.add_scalar(f"eval_metrics/{k}", v, num_episodes)
 
                     # gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     # if gfx_str != "":

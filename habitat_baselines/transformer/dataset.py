@@ -38,7 +38,10 @@ class StateActionReturnDataset(Dataset):
 
     def __getitem__(self, idx):
         block_size = self.block_size
-        done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)], idx + block_size)
+        try:
+            done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)], idx + block_size)
+        except:
+            done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)-1], idx + block_size)
         idx = done_idx - block_size
         
         if idx < 0:
@@ -55,7 +58,10 @@ class StateActionReturnDataset(Dataset):
 
     def __getindex__(self, idx):
         block_size = self.block_size
-        done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)], idx + block_size)
+        try:
+            done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)], idx + block_size)
+        except:
+            done_idx = min(self.done_idxs[np.searchsorted(self.done_idxs, idx)-1], idx + block_size)
         return torch.arange(done_idx - block_size, done_idx)
 
     @classmethod
