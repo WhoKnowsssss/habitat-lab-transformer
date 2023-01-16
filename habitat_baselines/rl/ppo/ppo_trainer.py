@@ -1154,14 +1154,14 @@ class PPOTrainer(BaseRLTrainer):
             for i in range(len(policy_info)):
                 infos[i].update(policy_info[i])
 
-            #HACK
-            for i in range(len(policy_info)):
-                infos[i].update(
-                    {
-                    "obj_curr_pos": "{},{},{}".format(batch['obj_goal_pos_sensor'][i,0], batch['obj_goal_pos_sensor'][i,1], batch['obj_goal_pos_sensor'][i,2]),
-                    "abs_obj_pos": "{},{},{}".format(batch['abs_obj_start_sensor'][i,0], batch['abs_obj_start_sensor'][i,1], batch['abs_obj_start_sensor'][i,2]),
-                    }
-                )
+            # #HACK
+            # for i in range(len(policy_info)):
+            #     infos[i].update(
+            #         {
+            #         "obj_curr_pos": "{},{},{}".format(batch['obj_goal_pos_sensor'][i,0], batch['obj_goal_pos_sensor'][i,1], batch['obj_goal_pos_sensor'][i,2]),
+            #         "abs_obj_pos": "{},{},{}".format(batch['abs_obj_start_sensor'][i,0], batch['abs_obj_start_sensor'][i,1], batch['abs_obj_start_sensor'][i,2]),
+            #         }
+            #     )
             batch = batch_obs(  # type: ignore
                 observations,
                 device=self.device,
@@ -1263,7 +1263,7 @@ class PPOTrainer(BaseRLTrainer):
                             % self.config.DATASET_SAVE_INTERVAL
                             == 0
                         ):
-                            flush_episodes()
+                            # flush_episodes()
                             all_obs = []
                             all_rewards = []
                             all_masks = []

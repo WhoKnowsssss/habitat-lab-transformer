@@ -103,7 +103,7 @@ class BaseTrainer:
             self.config = resume_state["config"]
             prev_ckpt_ind = resume_state["prev_ckpt_ind"]
         else:
-            prev_ckpt_ind = -1
+            prev_ckpt_ind = -2
 
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)
