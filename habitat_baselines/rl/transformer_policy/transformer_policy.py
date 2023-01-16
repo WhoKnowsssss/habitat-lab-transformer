@@ -430,7 +430,7 @@ class TransformerResNetPolicy(NetPolicy):
                 temp_target.reshape(B, -1).long(),
                 label_smoothing=0.05,
             )
-            # loss = loss + loss_p
+            loss = loss + loss_p
             accuracy_p = torch.sum(
                 torch.argmax(self.aux_head(features), dim=-1)
                 == temp_target.reshape(B, -1).long()

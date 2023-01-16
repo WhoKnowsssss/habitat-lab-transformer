@@ -71,7 +71,10 @@ def read_dataset(
             import time
 
             s = time.perf_counter()
-            dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            try:
+                dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            except:
+                continue
             # print("dataset load time", time.perf_counter() - s)
 
             temp_obs = np.array(dataset_raw["obs"])
@@ -268,6 +271,18 @@ def read_dataset(
             # for i in range(len(temp_obs)):
             #     if temp_obs[i]['skill'] != 3:
             #         temp_obs[i]['skill'] = int(temp_obs[i]['is_holding'])
+
+
+            if 'abs_obj_start_sensor' in temp_obs[0].keys():
+                for i in range(len(temp_obs)):
+                    try:
+                        temp_obs[i].pop('abs_obj_start_sensor')
+                        temp_obs[i].pop('ee_pos')
+                        temp_obs[i].pop('obj_start_offset_sensor')
+                        temp_obs[i].pop('obj_goal_pos_sensor')
+                        temp_obs[i].pop('all_predicates')
+                    except KeyError:
+                        pass
 
 
 
