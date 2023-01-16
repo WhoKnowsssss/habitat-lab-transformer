@@ -539,6 +539,7 @@ class TransformerTrainer(BaseRLTrainer):
             (self.num_updates_done % self.config.TEST_INTERVAL == 0)
             and not self.evaluated
         )
+        is_train = True
         self.transformer_policy.train(True) #is_train
 
         if is_train:

@@ -6,7 +6,7 @@ TORCH_GPU_ID: 0
 # VIDEO_OPTION: ['disk']
 VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/easy_offline_bc"
+VIDEO_DIR: "video_dir/easy_offline_dt_skill"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -14,11 +14,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/easy_offline_bc"
+EVAL_CKPT_PATH_DIR: "data/ckpts/easy_offline_dt_skill"
 NUM_ENVIRONMENTS: 8
 WRITER_TYPE: 'wb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/easy_offline_bc"
+CHECKPOINT_FOLDER: "data/ckpts/easy_offline_dt_skill"
 NUM_UPDATES: 800
 TEST_INTERVAL: 20
 TOTAL_NUM_STEPS: -1.0
@@ -46,7 +46,7 @@ RL:
       use_rgb: false
       offline: true
       include_visual_keys: ["robot_head_depth"] # "robot_head_depth", robot_head_rgb
-      train_planner: true
+      train_planner: false
       train_control: true
       temperature: 1.0
       
@@ -83,8 +83,8 @@ RL:
     return_to_go: 100
     context_length: 30
     max_episode_step: 500
-    # model_type: "reward_conditioned"
-    model_type: "bc"
+    model_type: "reward_conditioned"
+    # model_type: "bc"
     # model_type: "bc_no_skill"
     n_head: 8
     n_layer: 2
@@ -125,5 +125,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "easy_offline_bc_eval_train"
+  RUN_NAME: "easy_offline_dt_skill_eval_train"
   GROUP: "trfm_easy_eval"

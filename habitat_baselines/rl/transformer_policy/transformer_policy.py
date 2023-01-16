@@ -110,6 +110,7 @@ class TransformerResNetPolicy(NetPolicy):
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
+            self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
 
         self.action_config = policy_config.ACTION_DIST
 
@@ -420,18 +421,33 @@ class TransformerResNetPolicy(NetPolicy):
                 == targets[:, :, 10].long()
             ) / np.prod(targets[:, :, 10].shape)
 
-            # ========================== stop action ============================
-            # loss4 = F.cross_entropy(logits_stop.permute(0,2,1), targets[:,:,10].long(), label_smoothing=0.05)
-            # accuracy4 = torch.sum(torch.argmax(logits_stop[:,:,:], dim=-1) == targets[:,:,10].long()) / np.prod(targets[:,:,10].shape)
+            # ========================== aux loss ============================
+            # DTHACK
+            B = actions.shape[0]
+            temp_target = states["skill"].reshape(B, -1, 1)
+            loss_p = F.cross_entropy(
+                self.aux_head(features).permute(0, 2, 1),
+                temp_target.reshape(B, -1).long(),
+                label_smoothing=0.05,
+            )
+            loss = loss + loss_p
+            accuracy_p = torch.sum(
+                torch.argmax(self.aux_head(features), dim=-1)
+                == temp_target.reshape(B, -1).long()
+            ) / np.prod(temp_target.shape)
+            loss_dict.update(
+                {
+                    "aux_skill": loss_p.detach().item(),
+                    "accuracy_skill": accuracy_p.detach().item(),
+                }
+            )
 
             loss_dict.update(
                 {
                     "locomotion": loss1.detach().item(),
                     "arm": loss2.detach().item(),
                     "pick": loss3.detach().item(),
-                    # "place": loss4.detach().item(),
                     "accuracy_pick": accuracy3.detach().item(),
-                    # "accuracy_place": accuracy4.detach().item(),
                 }
             )
 
@@ -464,7 +480,7 @@ class TransformerResNetPolicy(NetPolicy):
             loss2 = torch.exp(-self.loss_vars[1]) * loss2 + self.loss_vars[1]
             loss3 = torch.exp(-self.loss_vars[2]) * loss3 + self.loss_vars[2]
             # loss = torch.exp(-self.loss_vars[3]) * loss + self.loss_vars[3]
-            loss = loss + loss1 + loss2 + loss3  # + loss4
+            loss = loss + loss1 + loss2 + loss3
         return loss, loss_dict
 
     def get_policy_info(self, infos, dones):
