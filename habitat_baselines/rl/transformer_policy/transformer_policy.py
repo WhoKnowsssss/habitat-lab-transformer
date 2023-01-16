@@ -616,6 +616,7 @@ class TransformerResNetPolicy(NetPolicy):
                 ),
                 "timeout": self.net.timeout[i],
                 "timeout2": self.net.timeout2[i],
+                "timeout3": self.net.timeout3[i],
                 # "angle": "{}, {}, {}, {}".format( self.angle[i], 0.2 * torch.cos(self.angle[i]), 0.2 * torch.sin(self.angle[i]), (self.net.cur_skill == 5) & (self.net.timeout > 50)[i])
             }
             policy_infos.append(policy_info)
@@ -668,11 +669,10 @@ class TransformerResNetPolicy(NetPolicy):
     def _back_up(
         self, observations, prev_actions, rnn_hidden_states, reset_mask
     ):
-        if self.net.timeout[0] > 10 and (
-            self.net.cur_skill[0] == 6
-        ):  # (self.net.cur_skill[0] == 0 or self.net.cur_skill[0] == 4)
-            prev_actions[0, 8:10] = torch.tensor([-1, 0]).cuda()
-            self.net.timeout[0] -= 10
+        mask = (self.net.timeout3 > 10) & (self.net.cur_skill == 6)
+        prev_actions[mask, 8] = -1
+        prev_actions[mask, 9] = 0
+        self.net.timeout3[mask] -= 10
 
 
 class TransformerResnetNet(nn.Module):
@@ -973,17 +973,20 @@ class TransformerResnetNet(nn.Module):
         if not hasattr(self, "timeout"):
             self.timeout = torch.zeros(B, device=rnn_hidden_states.device)
             self.timeout2 = torch.zeros(B, device=rnn_hidden_states.device)
+            self.timeout3 = torch.zeros(B, device=rnn_hidden_states.device)
 
         if not hasattr(self, "switched"):
             self.switched = torch.zeros(B, device=rnn_hidden_states.device).bool()
 
         self.timeout *= masks.view(-1)
+        self.timeout2 *= masks.view(-1)
+        self.timeout3 *= masks.view(-1)
         self.switched *= masks.view(-1)
 
         mask = (observations["is_holding"].reshape(-1) == 0) & (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == 2)
         rnn_hidden_states[torch.arange(B), current_context, -obs_dim] -= mask * 1
-        mask = (observations["is_holding"].reshape(-1) == 1) & (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == 3)
-        rnn_hidden_states[torch.arange(B), current_context, -obs_dim] -= mask * 1
+        # mask = (observations["is_holding"].reshape(-1) == 1) & (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == 3)
+        # rnn_hidden_states[torch.arange(B), current_context, -obs_dim] -= mask * 1
         
         # HACK
         mask = (
@@ -1039,33 +1042,44 @@ class TransformerResnetNet(nn.Module):
         self.timeout[mask] += 1
         self.timeout[~mask] = 0
         self.timeout2[self.switched] += 1
+        
 
-        if (self.timeout[0] > 350) or (self.timeout[0] > 250 and not (
-            self.cur_skill[0] == 3
-            or self.cur_skill[0] == 5
-        )):
-            prob = (
-                torch.softmax(out[torch.arange(B), current_context], dim=-1)
-                .cpu()
-                .numpy()
-            )
-            prob[0, :4] = 0.25
-            prob[0, 4:] = 0.
-            select = (
-                torch.from_numpy(
-                    np.array([np.random.choice(np.arange(10), p=prob[0])])
-                )
-                .float()
-                .cuda()
-            )
-            rnn_hidden_states[
-                torch.arange(B), current_context, -obs_dim
-            ] = select
+        # if not hasattr(self, "last_dist"):
+        #     self.last_dist = observations["obj_start_gps_compass"][:, 0]
+        # mask = (torch.abs(observations["obj_start_gps_compass"][:, 0] - self.last_dist) < 0.02) & ((rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == 0) | (rnn_hidden_states[torch.arange(B), current_context, -obs_dim] == 4))
+        # self.timeout3[mask] += 1
+        # self.last_dist = observations["obj_start_gps_compass"][:, 0]
+        # mask = self.timeout3 > 100
+        # rnn_hidden_states[torch.arange(B), current_context, -obs_dim] = 6 * mask + rnn_hidden_states[torch.arange(B), current_context, -obs_dim] * (~mask)
+        # mask = (self.timeout3 > 10) & (self.cur_skill == 6)
+        # rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] = (~mask) * rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim
+        # ] + 6 * mask
 
-            # Backup
-            rnn_hidden_states[
-                torch.arange(B), current_context, -obs_dim
-            ] = 6
+
+        # if (self.timeout[0] > 350) or (self.timeout[0] > 250 and not (
+        #     self.cur_skill[0] == 3
+        #     or self.cur_skill[0] == 5
+        # )):
+        #     prob = (
+        #         torch.softmax(out[torch.arange(B), current_context], dim=-1)
+        #         .cpu()
+        #         .numpy()
+        #     )
+        #     prob[0, :4] = 0.25
+        #     prob[0, 4:] = 0.
+        #     select = (
+        #         torch.from_numpy(
+        #             np.array([np.random.choice(np.arange(10), p=prob[0])])
+        #         )
+        #         .float()
+        #         .cuda()
+        #     )
+        #     rnn_hidden_states[
+        #         torch.arange(B), current_context, -obs_dim
+        #     ] = select
 
         self.reset_mask = (
             (
@@ -1079,12 +1093,9 @@ class TransformerResnetNet(nn.Module):
             )
         )
 
-        if (self.timeout[0] > 350) or (self.timeout[0] > 250 and not (
-            self.cur_skill[0] == 3
-            or self.cur_skill[0] == 5
-        )):
-            self.reset_mask[0] = True
-            self.timeout[0] = 0
+        mask = (self.timeout > 350) | ((self.timeout > 250) & ~((self.cur_skill == 3) | (self.cur_skill[0] == 5)))
+        self.reset_mask[mask] = True
+        self.timeout[mask] = 0
 
             
         mask = self.timeout2 > 250
@@ -1111,11 +1122,6 @@ class TransformerResnetNet(nn.Module):
         #          & (observations["obj_start_gps_compass"][:,0] < 2)
         #     ).float()
         # 2 * torch.argmax(out[torch.arange(B), current_context, 6:8], dim=-1).float()
-
-        if self.timeout[0] > 10 and (self.cur_skill[0] == 6):
-            rnn_hidden_states[
-                torch.arange(B), current_context, -obs_dim
-            ] = 6
 
         self.cur_skill_all = rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim

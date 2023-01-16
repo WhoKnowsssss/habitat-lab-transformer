@@ -905,10 +905,8 @@ class TransformerTrainer(BaseRLTrainer):
         first_nav_success_counter_temp = {}
         second_nav_success_counter_temp = {}
         while (
-            # len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
-            # and self.envs.num_envs > 0
-            len(stats_episodes)
-            < 200
+            len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
+            and self.envs.num_envs > 0
         ):
             current_episodes_info = self.envs.current_episodes()
 
