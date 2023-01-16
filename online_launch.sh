@@ -6,8 +6,8 @@ conda activate /srv/cvmlp-lab/flash1/xhuang394/conda/hab_new
 export TMPDIR=~/tmp/
 if [ $1 == "train" ];
 	then
-	wandb online
+	wandb offline
 else
 	wandb offline
 fi
-srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/transformer_test.yaml --run-type $1
+srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/transformer_online.yaml --run-type $1

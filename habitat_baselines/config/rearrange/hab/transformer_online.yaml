@@ -78,6 +78,7 @@ RL:
     reward_window_size: 50
 
     value_func_warmup: 1
+    warmup_updates: 500
 
     use_normalized_advantage: False
 
@@ -93,7 +94,7 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: data/ddppo-models/gibson-2plus-resnet50.pth
+    pretrained_weights: data/ckpts/easy_offline_4/ckpt.12.pth
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights
