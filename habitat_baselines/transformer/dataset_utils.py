@@ -37,6 +37,7 @@ def read_dataset(
 
     paths = config.trajectory_dir
     dataset_size = config.dataset_size
+    separate = config.dataset_size
 
     if not isinstance(paths, list):
         paths = [paths]
@@ -61,6 +62,9 @@ def read_dataset(
         if verbose:
             logger.info("Loading from buffer {}".format(buffer_num, i))
         file = filenames[buffer_num]
+        is_separate = False
+        if "rearrange_easy" in file:
+            is_separate = True
         try:
             file = os.readlink(file)
             # print('symbol link', file)
@@ -71,7 +75,10 @@ def read_dataset(
             import time
 
             s = time.perf_counter()
-            dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            try:
+                dataset_raw = torch.load(file, map_location=torch.device("cpu"))
+            except:
+                continue
             # print("dataset load time", time.perf_counter() - s)
 
             temp_obs = np.array(dataset_raw["obs"])
@@ -95,22 +102,22 @@ def read_dataset(
             # temp_dones = np.delete(temp_dones, stepwise_idx, 0)
 
             # ===================== Only Nav Pick ====================
-            # if True: #int(filenames[buffer_num][:-3]) <= 50000
-            #     temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
-            #     temp_start_idxs = np.roll(temp_done_idxs, 1)
-            #     temp_start_idxs[0] = 0
-            #     temp_nav_phase = np.all(temp_actions[:,:7] == 0, axis=-1).astype(np.int8)
-            #     temp_nav_phase = np.nonzero((temp_nav_phase[1:] - temp_nav_phase[:-1]) > 0)[0]
-            #     temp_nav_phase = np.concatenate([temp_nav_phase, temp_done_idxs[-1:]-1])
-            #     temp_nav_place_idx = np.searchsorted(temp_nav_phase, temp_start_idxs, side='left')
-            #     temp_nav_phase = temp_nav_phase[temp_nav_place_idx].reshape(-1)
-            #     stepwise_idx = np.concatenate([np.arange(temp_nav_phase[i] + 1 , temp_done_idxs[i]) for i in range(temp_nav_phase.shape[0])])
+            if is_separate:
+                temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1
+                temp_start_idxs = np.roll(temp_done_idxs, 1)
+                temp_start_idxs[0] = 0
+                temp_nav_phase = np.all(temp_actions[:,:7] == 0, axis=-1).astype(np.int8)
+                temp_nav_phase = np.nonzero((temp_nav_phase[1:] - temp_nav_phase[:-1]) > 0)[0]
+                temp_nav_phase = np.concatenate([temp_nav_phase, temp_done_idxs[-1:]-1])
+                temp_nav_place_idx = np.searchsorted(temp_nav_phase, temp_start_idxs, side='left')
+                temp_nav_phase = temp_nav_phase[temp_nav_place_idx].reshape(-1)
+                stepwise_idx = np.concatenate([np.arange(temp_nav_phase[i] + 1 , temp_done_idxs[i]) for i in range(temp_nav_phase.shape[0])])
 
-            #     temp_dones[temp_nav_phase] = False
-            #     temp_obs = np.delete(temp_obs, stepwise_idx, 0)
-            #     temp_actions = np.delete(temp_actions, stepwise_idx, 0)
-            #     temp_stepwise_returns = np.delete(temp_stepwise_returns, stepwise_idx, 0)
-            #     temp_dones = np.delete(temp_dones, stepwise_idx, 0)
+                temp_dones[temp_nav_phase] = False
+                temp_obs = np.delete(temp_obs, stepwise_idx, 0)
+                temp_actions = np.delete(temp_actions, stepwise_idx, 0)
+                temp_stepwise_returns = np.delete(temp_stepwise_returns, stepwise_idx, 0)
+                temp_dones = np.delete(temp_dones, stepwise_idx, 0)
 
             # ===================== Only Nav Place ====================
             # temp_done_idxs = np.argwhere(temp_dones == False).reshape(-1) + 1

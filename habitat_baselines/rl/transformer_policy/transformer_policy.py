@@ -110,7 +110,7 @@ class TransformerResNetPolicy(NetPolicy):
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
-            self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
+            # self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
 
         self.action_config = policy_config.ACTION_DIST
 
@@ -423,24 +423,24 @@ class TransformerResNetPolicy(NetPolicy):
 
             # ========================== aux loss ============================
             # DTHACK
-            B = actions.shape[0]
-            temp_target = states["skill"].reshape(B, -1, 1)
-            loss_p = F.cross_entropy(
-                self.aux_head(features).permute(0, 2, 1),
-                temp_target.reshape(B, -1).long(),
-                label_smoothing=0.05,
-            )
-            # loss = loss + loss_p
-            accuracy_p = torch.sum(
-                torch.argmax(self.aux_head(features), dim=-1)
-                == temp_target.reshape(B, -1).long()
-            ) / np.prod(temp_target.shape)
-            loss_dict.update(
-                {
-                    "aux_skill": loss_p.detach().item(),
-                    "accuracy_skill": accuracy_p.detach().item(),
-                }
-            )
+            # B = actions.shape[0]
+            # temp_target = states["skill"].reshape(B, -1, 1)
+            # loss_p = F.cross_entropy(
+            #     self.aux_head(features).permute(0, 2, 1),
+            #     temp_target.reshape(B, -1).long(),
+            #     label_smoothing=0.05,
+            # )
+            # # loss = loss + loss_p
+            # accuracy_p = torch.sum(
+            #     torch.argmax(self.aux_head(features), dim=-1)
+            #     == temp_target.reshape(B, -1).long()
+            # ) / np.prod(temp_target.shape)
+            # loss_dict.update(
+            #     {
+            #         "aux_skill": loss_p.detach().item(),
+            #         "accuracy_skill": accuracy_p.detach().item(),
+            #     }
+            # )
 
             loss_dict.update(
                 {
