@@ -110,7 +110,7 @@ class TransformerResNetPolicy(NetPolicy):
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
-            # self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
+            self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
 
         self.action_config = policy_config.ACTION_DIST
 
@@ -244,7 +244,7 @@ class TransformerResNetPolicy(NetPolicy):
         
         holding_mask = (
             self.holding_mask[state_index] != observations["is_holding"].reshape(B)
-        ) & (self.net.cur_skill[state_index] != 3) #BCHACK
+        ) #& (self.net.cur_skill[state_index] != 3) #BCHACK
         self.holding_mask[state_index] = observations["is_holding"].reshape(B).bool()
 
         self.reset_mask[state_index] = self.reset_mask[state_index] | holding_mask | self.net.reset_mask[state_index]
@@ -871,7 +871,7 @@ class TransformerResnetNet(nn.Module):
             rnn_hidden_states[torch.arange(B), current_context, -obs_dim]
             != self.cur_skill[state_index]
         )# & (self.cur_skill != 0) & (self.cur_skill != 4)
-        # self.reset_mask[:] = False #BCHACK
+        self.reset_mask[:] = False #BCHACK
         
         # self.reset_mask[mask] = True
 
