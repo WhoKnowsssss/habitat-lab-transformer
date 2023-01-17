@@ -161,10 +161,10 @@ class PPOTrainer(BaseRLTrainer):
         if self.config.RL.DDPPO.pretrained:
             self.actor_critic.load_state_dict(
                 {  # type: ignore
-                    k[len("actor_critic.") :]: v
+                    k[len("module.") :]: v
                     for k, v in pretrained_state["state_dict"].items()
                 },
-                # strict=False,
+                strict=False,
             )
         elif self.config.RL.DDPPO.pretrained_encoder:
             prefix = "actor_critic.net.visual_encoder."
@@ -297,7 +297,7 @@ class PPOTrainer(BaseRLTrainer):
             self.agent.load_state_dict(resume_state["state_dict"])
             # self.agent.optimizer.load_state_dict(resume_state["optim_state"])
         if self._is_distributed:
-            self.agent.init_distributed(find_unused_params=False)  # type: ignore
+            self.agent.init_distributed(find_unused_params=True)  # type: ignore
 
         logger.info(
             "agent number of parameters: {}".format(

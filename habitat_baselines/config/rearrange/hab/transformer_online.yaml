@@ -1,5 +1,5 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_easy.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/nav_pick.yaml
 TRAINER_NAME: "ppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
@@ -96,7 +96,7 @@ RL:
     # Visual encoder backbone
     pretrained_weights: data/ckpts/easy_offline_4/ckpt.12.pth
     # Initialize with pretrained weights
-    pretrained: False
+    pretrained: True
     # Initialize just the visual encoder backbone with pretrained weights
     pretrained_encoder: False
     # Whether or not the visual encoder backbone will be trained.
@@ -108,3 +108,10 @@ RL:
     backbone: resnet18
     rnn_type: LSTM
     num_recurrent_layers: 2
+
+
+WB:
+  PROJECT_NAME: "p-skill-transformer"
+  ENTITY: "cvmlp-whoknowsss"
+  RUN_NAME: "easy_online_test"
+  GROUP: "trfm_easy_online"

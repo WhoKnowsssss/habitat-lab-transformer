@@ -6,7 +6,7 @@ conda activate /srv/cvmlp-lab/flash1/xhuang394/conda/hab_new
 export TMPDIR=~/tmp/
 if [ $1 == "train" ];
 	then
-	wandb offline
+	wandb online
 else
 	wandb offline
 fi

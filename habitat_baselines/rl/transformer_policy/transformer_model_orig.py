@@ -69,7 +69,7 @@ class CausalSelfAttention(nn.Module):
         self.query = nn.Linear(config.n_embd, config.n_embd)
         self.value = nn.Linear(config.n_embd, config.n_embd)
         # regularization
-        if config.reg_flags['attention_dropout']:
+        if config.reg_flags["attention_dropout"]:
             self.attn_drop = nn.Dropout(config.attn_pdrop)
             self.resid_drop = nn.Dropout(config.resid_pdrop)
         # output projection
@@ -110,7 +110,7 @@ class CausalSelfAttention(nn.Module):
         #     att = att.masked_fill(attention_mask.repeat(T,self.n_head,1,1).transpose(0,2) == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
 
-        if hasattr(self, 'attn_drop'):
+        if hasattr(self, "attn_drop"):
             att = self.attn_drop(att)
         y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = (
@@ -118,7 +118,7 @@ class CausalSelfAttention(nn.Module):
         )  # re-assemble all head outputs side by side
 
         # output projection
-        if hasattr(self, 'resid_drop'):
+        if hasattr(self, "resid_drop"):
             y = self.resid_drop(self.proj(y))
         else:
             y = self.proj(y)
@@ -130,12 +130,12 @@ class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        if config.reg_flags['attention_layernorm']:
+        if config.reg_flags["attention_layernorm"]:
             self.ln1 = nn.LayerNorm(config.n_embd)
-        if config.reg_flags['feedforward_layernorm']:
+        if config.reg_flags["feedforward_layernorm"]:
             self.ln2 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        if config.reg_flags['feedforward_dropout']:
+        if config.reg_flags["feedforward_dropout"]:
             self.mlp = nn.Sequential(
                 nn.Linear(config.n_embd, 4 * config.n_embd),
                 GELU(),
@@ -148,18 +148,17 @@ class Block(nn.Module):
                 GELU(),
                 nn.Linear(4 * config.n_embd, config.n_embd),
             )
-        
 
     def forward(self, x):
-        if hasattr(self, 'ln1'):
+        if hasattr(self, "ln1"):
             x = x + self.attn(self.ln1(x))
         else:
             x = x + self.attn(x)
-        if hasattr(self, 'ln2'):
+        if hasattr(self, "ln2"):
             x = x + self.mlp(self.ln2(x))
         else:
             x = x + self.mlp(x)
-        
+
         return x
 
 
@@ -186,11 +185,11 @@ class GPT(nn.Module):
         self.pos_emb = nn.Parameter(
             torch.zeros(1, config.block_size, config.n_embd)
         )
-        if config.num_skills != 0: 
+        if config.num_skills != 0:
             self.skill_embedding = nn.Parameter(
                 torch.randn(config.num_skills, config.n_embd)
             )
-        if self.reg_flags['outer_dropout']:
+        if self.reg_flags["outer_dropout"]:
             self.drop = nn.Dropout(config.embd_pdrop)
 
         # transformer
@@ -199,7 +198,7 @@ class GPT(nn.Module):
         )
 
         # decoder head
-        if self.reg_flags['outer_layernorm']:
+        if self.reg_flags["outer_layernorm"]:
             self.ln_f = nn.LayerNorm(config.n_embd)
 
         self.apply(self._init_weights)
@@ -222,14 +221,16 @@ class GPT(nn.Module):
             )
 
         if self.model_type == "reward_conditioned":
-            self.ret_emb = nn.Sequential(nn.Linear(1, config.n_embd), nn.Tanh())
+            self.ret_emb = nn.Sequential(
+                nn.Linear(1, config.n_embd), nn.Tanh()
+            )
 
         self.action_embeddings = nn.Sequential(
             nn.Linear(config.vocab_size, config.n_embd), nn.Tanh()
         )
         nn.init.normal_(self.action_embeddings[0].weight, mean=0.0, std=0.02)
 
-        self.boundaries_mean = torch.linspace(-1, 1, 21 ).cuda()
+        self.boundaries_mean = torch.linspace(-1, 1, 21).cuda()
         self.boundaries = torch.linspace(-1.025, 1.025, 22).cuda()
 
     def get_block_size(self):
@@ -278,7 +279,7 @@ class GPT(nn.Module):
 
         # special case the position embedding parameter in the root GPT module as not decayed
         no_decay.add("pos_emb")
-        if config.num_skills != 0: 
+        if config.num_skills != 0:
             no_decay.add("skill_embedding")
 
         # validate that we considered every parameter
@@ -329,9 +330,19 @@ class GPT(nn.Module):
         #     states.shape[1], actions.shape[1], rtgs.shape[1]
         # )
 
-        if states.shape[-1] == self.n_embd // 2 + self.config.num_states[1] + 1:
+        if (
+            states.shape[-1]
+            == self.n_embd // 2 + self.config.num_states[1] + 1
+        ):
             states, skill_set = torch.split(
                 states, [self.n_embd // 2 + self.config.num_states[1], 1], -1
+            )
+        elif (
+            states.shape[-1]
+            == self.n_embd // 2 + self.config.num_states[1] + 10
+        ):
+            states, skill_set = torch.split(
+                states, [self.n_embd // 2 + self.config.num_states[1], 10], -1
             )
         else:
             skill_set = None
@@ -355,7 +366,7 @@ class GPT(nn.Module):
             # actions[:, :, :7] = (
             #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
             # ) / 10 * 2 - 1
-            actions[:,:,[10]] = 0
+            actions[:, :, [10]] = 0
             actions = actions.type(torch.float32)
             # targets = torch.bucketize(targets[:,:,:], self.boundaries) - 1
             # if actions.shape[-1] == 12:
@@ -393,7 +404,7 @@ class GPT(nn.Module):
             # actions[:, :, :7] = (
             #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
             # ) / 10 * 2 - 1
-            actions[:,:,[10]] = 0
+            actions[:, :, [10]] = 0
             actions = actions.type(torch.float32)
             action_embeddings = self.action_embeddings(
                 actions
@@ -408,7 +419,18 @@ class GPT(nn.Module):
                     dtype=torch.float32,
                     device=action_embeddings.device,
                 )
-                token_embeddings[:,  :: (self.num_inputs), :] = self.skill_embedding[skill_set.long()].repeat(1,1,1,1).view(skill_set.shape[0],-1,self.config.n_embd)
+                if skill_set.shape[-1] == 1:
+                    token_embeddings[:, :: (self.num_inputs), :] = (
+                        self.skill_embedding[skill_set.long()]
+                        .repeat(1, 1, 1, 1)
+                        .view(skill_set.shape[0], -1, self.config.n_embd)
+                    )
+                else:
+                    token_embeddings[:, :: (self.num_inputs), :] = (
+                        F.linear(skill_set.float(), self.skill_embedding.t())
+                        .repeat(1, 1, 1, 1)
+                        .view(skill_set.shape[0], -1, self.config.n_embd)
+                    )
                 token_embeddings[:, 1 :: (self.num_inputs), :] = torch.cat(
                     [state_inputs[0], state_inputs[-1]], dim=-1
                 )
@@ -423,7 +445,7 @@ class GPT(nn.Module):
             # actions[:, :, :7] = (
             #     torch.bucketize(actions[:, :, :7], self.boundaries) - 1
             # ) / 10 * 2 - 1
-            actions[:,:,[10]] = 0
+            actions[:, :, [10]] = 0
             actions = actions.type(torch.float32)
             action_embeddings = self.action_embeddings(
                 actions
@@ -431,7 +453,7 @@ class GPT(nn.Module):
             token_embeddings = torch.zeros(
                 (
                     states.shape[0],
-                    (self.num_inputs-1) * states.shape[1],
+                    (self.num_inputs - 1) * states.shape[1],
                     self.config.n_embd,
                 ),
                 dtype=torch.float32,
@@ -455,16 +477,16 @@ class GPT(nn.Module):
         # position_embeddings = torch.gather(all_global_pos_emb, 1, torch.repeat_interleave(timesteps, self.config.n_embd, dim=-1)) + self.pos_emb[:, :token_embeddings.shape[1], :]
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
         x = token_embeddings + position_embeddings
-        if self.reg_flags['outer_dropout']:
+        if self.reg_flags["outer_dropout"]:
             x = self.drop(x)
         x = self.blocks(x)
-        if self.reg_flags['outer_layernorm']:
+        if self.reg_flags["outer_layernorm"]:
             x = self.ln_f(x)
 
         if actions is not None and self.model_type == "reward_conditioned":
             return x[:, (self.num_inputs - 2) :: (self.num_inputs), :]
         elif actions is not None and self.model_type == "bc":
-            if skill_set is not None: 
+            if skill_set is not None:
                 return x[:, 1 :: (self.num_inputs), :]
             return x[:, (self.num_inputs - 3) :: (self.num_inputs - 1), :]
         elif actions is not None and self.model_type == "bc_no_skill":
@@ -473,8 +495,6 @@ class GPT(nn.Module):
             raise NotImplementedError()
 
 
-
-    
 class PlannerGPT(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -524,7 +544,7 @@ class PlannerGPT(nn.Module):
                 ]
             )
         self.output_head = nn.Linear(config.n_embd, config.num_skills)
-        self.output_head2 = nn.Linear(config.n_embd, 4)
+        # self.output_head2 = nn.Linear(config.n_embd, 4)
         # self.output_head2.requires_grad_(False)
 
     def _init_weights(self, module):
@@ -543,10 +563,10 @@ class PlannerGPT(nn.Module):
                 states, [self.n_embd // 2, self.config.num_states[1]], -1
             )
         )
-        
+
         for i in range(1, len(state_inputs)):
             state_inputs[i] = self.state_encoder[i - 1](
-                state_inputs[i].type(torch.float32)#[..., 3:13]
+                state_inputs[i].type(torch.float32)  # [..., 3:13]
             )
 
         token_embeddings = torch.zeros(
@@ -559,14 +579,14 @@ class PlannerGPT(nn.Module):
             device=states.device,
         )
 
-        token_embeddings[:,::self.num_inputs,:] = torch.cat(
+        token_embeddings[:, :: self.num_inputs, :] = torch.cat(
             [state_inputs[0], state_inputs[-1]], dim=-1
         )
-    
+
         position_embeddings = self.pos_emb[:, : token_embeddings.shape[1], :]
 
         x = self.drop(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.ln_f(x)
 
-        return self.output_head(x), self.output_head2(x)
+        return self.output_head(x), None #self.output_head2(x)
