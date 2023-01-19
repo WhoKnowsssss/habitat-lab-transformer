@@ -159,9 +159,11 @@ class PPOTrainer(BaseRLTrainer):
             )
 
         if self.config.RL.DDPPO.pretrained:
+            prefix = "actor_critic."
+            # prefix = "module."
             self.actor_critic.load_state_dict(
                 {  # type: ignore
-                    k[len("module.") :]: v
+                    k[len(prefix) :]: v
                     for k, v in pretrained_state["state_dict"].items()
                 },
                 strict=False,
@@ -1064,12 +1066,16 @@ class PPOTrainer(BaseRLTrainer):
         pbar = tqdm.tqdm(total=number_of_eval_episodes * evals_per_ep)
         self.actor_critic.eval()
 
-        if self.config.DATASET_SAVE_PATH is not None:
-            os.makedirs(self.config.DATASET_SAVE_PATH, exist_ok=True)
+        try:
+            save_data_dir = self.config.DATASET_SAVE_PATH
+        except AttributeError:
+            save_data_dir = None
+        if save_data_dir is not None:
+            os.makedirs(save_data_dir, exist_ok=True)
 
             def flush_episodes():
                 save_path = os.path.join(
-                    self.config.DATASET_SAVE_PATH, f"{saved_num_episodes}.pt"
+                    save_data_dir, f"{saved_num_episodes}.pt"
                 )
                 torch.save(
                     {
@@ -1181,11 +1187,11 @@ class PPOTrainer(BaseRLTrainer):
             next_episodes_info = self.envs.current_episodes()
             envs_to_pause = []
             n_envs = self.envs.num_envs
-            if self.config.DATASET_SAVE_PATH is not None:
+            if save_data_dir is not None:
                 visual_batch = get_save_obs(batch)
 
             for i in range(n_envs):
-                if self.config.DATASET_SAVE_PATH is not None:
+                if save_data_dir is not None:
                     # Add the step to the buffer
                     buffer_obs[i].append(visual_batch[i])
                     buffer_rewards[i].append(rewards[i])
@@ -1227,7 +1233,7 @@ class PPOTrainer(BaseRLTrainer):
                 # episode ended
                 if not not_done_masks[i].item():
                     # Flush buffer to the final dataset
-                    if self.config.DATASET_SAVE_PATH is not None:
+                    if save_data_dir is not None:
                         all_obs.extend(
                             [
                                 {k: v for k, v in obs.items()}
@@ -1309,16 +1315,20 @@ class PPOTrainer(BaseRLTrainer):
                             / num_episodes
                         )
 
-                    print(
-                        "\n\nSuccess Rate: ",
-                        aggregated_stats["composite_success"],
-                    )
-                    print(
-                        "Rearrange success: ",
-                        sum(success_counter_temp) / len(success_counter_temp)
-                        if len(success_counter_temp) > 0
-                        else 0,
-                    )
+                    # print(
+                    #     "\n\nSuccess Rate: ",
+                    #     aggregated_stats["composite_success"],
+                    # )
+                    # print(
+                    #     "Rearrange success: ",
+                    #     sum(success_counter_temp) / len(success_counter_temp)
+                    #     if len(success_counter_temp) > 0
+                    #     else 0,
+                    # )
+
+                    metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
+                    for k, v in metrics.items():
+                        print(f"{k}", v)
 
                     gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     if gfx_str != "":

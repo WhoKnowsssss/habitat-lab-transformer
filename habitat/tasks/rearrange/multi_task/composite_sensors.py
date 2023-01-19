@@ -96,6 +96,12 @@ class MoveObjectsReward(RearrangeReward):
         self._prev_ee_to_obj_dist = self.get_distance(
             task, EndEffectorToObjectDistance
         )
+        self._prev_obj_to_goal_dist_base = task.sensor_suite.sensors[
+            "obj_goal_gps_compass"
+        ].get_observation(task)[0]
+        self._prev_ee_to_obj_dist_base = task.sensor_suite.sensors[
+            "obj_start_gps_compass"
+        ].get_observation(task)[0]
 
         self.update_metric(
             *args,
@@ -140,6 +146,12 @@ class MoveObjectsReward(RearrangeReward):
 
         obj_to_goal_dist = self.get_distance(task, ObjectToGoalDistance)
         ee_to_obj_dist = self.get_distance(task, EndEffectorToObjectDistance)
+        obj_to_goal_dist_base = task.sensor_suite.sensors[
+            "obj_goal_gps_compass"
+        ].get_observation(task)[0]
+        ee_to_obj_dist_base = task.sensor_suite.sensors[
+            "obj_start_gps_compass"
+        ].get_observation(task)[0]
 
         is_holding_obj = self._sim.grasp_mgr.snap_idx == self.abs_targ_obj_idx
         picked_up_obj = is_holding_obj and not self._prev_holding_obj
@@ -148,9 +160,16 @@ class MoveObjectsReward(RearrangeReward):
 
         if is_holding_obj:
             dist_diff = self._prev_obj_to_goal_dist - obj_to_goal_dist
+            dist_diff_base = (
+                self._prev_obj_to_goal_dist_base - obj_to_goal_dist_base
+            )
         else:
             dist_diff = self._prev_ee_to_obj_dist - ee_to_obj_dist
+            dist_diff_base = (
+                self._prev_ee_to_obj_dist_base - ee_to_obj_dist_base
+            )
         self._metric += self._config.DIST_REWARD * dist_diff
+        self._metric += self._config.DIST_REWARD_BASE * dist_diff_base
 
         # PICK REWARD: Reward for picking up the object, only given once to avoid
         # reward hacking.
@@ -180,6 +199,12 @@ class MoveObjectsReward(RearrangeReward):
         self._prev_ee_to_obj_dist = self.get_distance(
             task, EndEffectorToObjectDistance
         )
+        self._prev_obj_to_goal_dist_base = task.sensor_suite.sensors[
+            "obj_goal_gps_compass"
+        ].get_observation(task)[0]
+        self._prev_ee_to_obj_dist_base = task.sensor_suite.sensors[
+            "obj_start_gps_compass"
+        ].get_observation(task)[0]
         self._prev_holding_obj = is_holding_obj
 
 

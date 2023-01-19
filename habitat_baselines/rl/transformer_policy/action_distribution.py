@@ -273,6 +273,7 @@ class MixedDistributionNet(ActionDistributionNet):
 
         if not use_std_param:
             nn.init.constant_(self.std_head.bias[:], std_init)
+            nn.init.constant_(self.std_head.bias[:7], std_init - 2) #HACK
 
         ###HACK
 

@@ -488,10 +488,10 @@ class TransformerResNetPolicy(NetPolicy):
         for i, info in enumerate(infos):
             policy_info = {
                 "cur_skill": self.net.cur_skill[i],
-                "reset_arm": self.reset_mask[i],
-                "gripper": self.gripper_action[i],
-                "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3]),
-                "timeout": self.net.timeout[i] 
+        #         "reset_arm": self.reset_mask[i],
+        #         "gripper": self.gripper_action[i],
+        #         "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3]),
+        #         "timeout": self.net.timeout[i] 
             }
             policy_infos.append(policy_info)
 
@@ -826,22 +826,26 @@ class TransformerResnetNet(nn.Module):
         )
         # self.predicted_dist = predicted_dist[torch.arange(B), current_context]
         # rnn_hidden_states[
-        #     torch.arange(B), current_context, -obs_dim
-        # ] = torch.argmax(out[torch.arange(B), current_context], dim=-1).float()
+        #     torch.arange(B), current_context, -obs_dim:-obs_dim+10
+        # ] = F.one_hot(torch.argmax(out[torch.arange(B), current_context], dim=-1), 10).float().detach()
+        # rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim:-obs_dim+10
+        # ] = F.gumbel_softmax(out[torch.arange(B), current_context], tau=0.1, hard=True, dim=-1).float()
         rnn_hidden_states[
             torch.arange(B), current_context, -obs_dim:-obs_dim+10
-        ] = F.gumbel_softmax(out[torch.arange(B), current_context], tau=0.1, hard=True, dim=-1).float()
+        ] = F.one_hot(-2*(observations["obj_goal_gps_compass"][:,0] < 1.5) + 4, 10).float()
 
-        # if not hasattr(self, "cur_skill"):
-        #     self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)
 
-        # if not hasattr(self, "timeout"):
-        #     self.timeout = torch.zeros(B, device=rnn_hidden_states.device)
+        if not hasattr(self, "cur_skill"):
+            self.cur_skill = torch.zeros(B, device=rnn_hidden_states.device)
+
+        if not hasattr(self, "timeout"):
+            self.timeout = torch.zeros(B, device=rnn_hidden_states.device)
 
         # if not hasattr(self, "reset_mask"):
         #     self.reset_mask = torch.zeros(B, dtype=torch.bool, device=rnn_hidden_states.device)
 
-        # state_index = list(range(self.timeout.shape[0]))
+        state_index = list(range(self.timeout.shape[0]))
         # if envs_to_pause is not None: 
         #     envs_to_pause.sort()
         #     for idx in reversed(envs_to_pause):
@@ -863,9 +867,9 @@ class TransformerResnetNet(nn.Module):
         
         # # self.reset_mask[mask] = True
 
-        # self.cur_skill[state_index] = rnn_hidden_states[
-        #     torch.arange(B), current_context, -obs_dim
-        # ]
+        # self.cur_skill[state_index] = torch.argmax(rnn_hidden_states[
+        #     torch.arange(B), current_context, -obs_dim:-obs_dim+10
+        # ], dim=-1).float()
 
         if rtgs is not None:
             rnn_hidden_states[

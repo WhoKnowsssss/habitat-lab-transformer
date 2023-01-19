@@ -1,23 +1,24 @@
 VERBOSE: False
-BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/nav_pick.yaml
+BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/nav_place.yaml
 TRAINER_NAME: "ppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ["disk"]
+# VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/easy_online_1"
+VIDEO_DIR: "video_dir/easy_online_13"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
 VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/easy_online_1"
-NUM_ENVIRONMENTS: 16
-WRITER_TYPE: 'tb'
+EVAL_CKPT_PATH_DIR: "data/ckpts_online/easy_online_13/ckpt.0.pth"
+NUM_ENVIRONMENTS: 24
+WRITER_TYPE: 'wb'
 # Visual sensors to include
 SENSORS: ["HEAD_DEPTH_SENSOR"]
-CHECKPOINT_FOLDER: "data/easy_online_1"
+CHECKPOINT_FOLDER: "data/ckpts_online/easy_online_13"
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 1.0e8
 LOG_INTERVAL: 10
@@ -25,7 +26,9 @@ NUM_CHECKPOINTS: 20
 # Force PyTorch to be single threaded as
 # this improves performance considerably
 FORCE_TORCH_SINGLE_THREADED: True
-EVAL_KEYS_TO_INCLUDE_IN_NAME: ['reward', 'force', 'success']
+EVAL_KEYS_TO_INCLUDE_IN_NAME: ['success']
+
+DATASET_SAVE_PATH: None
 
 RL:
   POLICY:
@@ -34,8 +37,9 @@ RL:
       ACTION_DIST:
         discrete_arm: false
         discrete_base: false
-        use_std_param: true
+        use_std_param: false
         temperature: 1.0
+        log_std_init: -1.0
       use_rgb: false
       offline: false
       include_visual_keys: ["robot_head_depth"]
@@ -65,8 +69,8 @@ RL:
     ppo_epoch: 2
     num_mini_batch: 2
     value_loss_coef: 0.5
-    entropy_coef: 0.0002
-    lr: 1e-5
+    entropy_coef: 0.0005
+    lr: 3e-6
     eps: 1e-5
     max_grad_norm: 0.2
     num_steps: 128
@@ -74,11 +78,12 @@ RL:
     gamma: 0.99
     tau: 0.95
     use_linear_clip_decay: False
-    use_linear_lr_decay: False
+    use_linear_lr_decay: True
     reward_window_size: 50
 
-    value_func_warmup: 1
+    value_func_warmup: 51
     warmup_updates: 500
+    use_warmup_linear_lr_decay: True
 
     use_normalized_advantage: False
 
@@ -94,13 +99,13 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: data/ckpts/easy_offline_4/ckpt.12.pth
+    pretrained_weights: data/ckpts_online/easy_online_4/ckpt.0.pth
     # Initialize with pretrained weights
     pretrained: True
     # Initialize just the visual encoder backbone with pretrained weights
     pretrained_encoder: False
     # Whether or not the visual encoder backbone will be trained.
-    train_encoder: True
+    train_encoder: False
     # Whether or not to reset the critic linear layer
     reset_critic: True
 

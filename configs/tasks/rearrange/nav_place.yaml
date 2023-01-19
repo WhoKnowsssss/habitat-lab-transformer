@@ -15,13 +15,14 @@ DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
     DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_easy.json.gz
+    # DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_1k_2.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangeCompositeTask-v0
 
     REWARD_MEASURE: "move_obj_reward"
     SUCCESS_MEASURE: "composite_success"
-    SUCCESS_REWARD: 100.0
+    SUCCESS_REWARD: 0.0
     SLACK_REWARD: -0.01
     END_ON_SUCCESS: True
 
@@ -46,21 +47,25 @@ TASK:
     - LOCALIZATION_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
+        # MAX_ACCUM_FORCE: 100_000.0
+        # MAX_INSTANT_FORCE: 10_000.0
         MAX_ACCUM_FORCE: -1.0
+
     ROBOT_FORCE:
         TYPE: RobotForce
         MIN_FORCE: 20.0
     MOVE_OBJECTS_REWARD:
         TYPE: MoveObjectsReward
         PICK_REWARD: 1.0
-        SUCCESS_DIST: 0.15
+        SUCCESS_DIST: 0.3
         SINGLE_REARRANGE_REWARD: 1.0
-        DIST_REWARD: 1.0
+        DIST_REWARD: 0.0
+        DIST_REWARD_BASE: 5.0
         # General Rearrange Reward config
-        CONSTRAINT_VIOLATE_PEN: 10.0
+        CONSTRAINT_VIOLATE_PEN: 0.0
         FORCE_PEN: 0.0
-        MAX_FORCE_PEN: 1.0
-        FORCE_END_PEN: 10.0
+        MAX_FORCE_PEN: 0.0
+        FORCE_END_PEN: 0.0
     MEASUREMENTS:
     - OBJECT_TO_GOAL_DISTANCE
     - ROBOT_FORCE
