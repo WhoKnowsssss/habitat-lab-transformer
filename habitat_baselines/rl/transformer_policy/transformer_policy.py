@@ -110,7 +110,7 @@ class TransformerResNetPolicy(NetPolicy):
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
-            self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
+            # self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
 
         self.action_config = policy_config.ACTION_DIST
 

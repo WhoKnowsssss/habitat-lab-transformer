@@ -6,7 +6,7 @@ TORCH_GPU_ID: 0
 # VIDEO_OPTION: ['disk']
 VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
-VIDEO_DIR: "video_dir/easy_offline_separate_all"
+VIDEO_DIR: "video_dir/rearrange_2layer_200_6.0E-5"
 VIDEO_FPS: 30
 VIDEO_RENDER_TOP_DOWN: False
 VIDEO_RENDER_ALL_INFO: True
@@ -14,11 +14,11 @@ VIDEO_RENDER_VIEWS:
   - "THIRD_RGB_SENSOR"
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
-EVAL_CKPT_PATH_DIR: "data/ckpts/easy_offline_separate_all"
+EVAL_CKPT_PATH_DIR: "data/ckpts/rearrange_2layer_200_6.0E-5/ckpt.50.pth"
 NUM_ENVIRONMENTS: 8
-WRITER_TYPE: 'wb'
+WRITER_TYPE: 'tb'
 # Visual sensors to include
-CHECKPOINT_FOLDER: "data/ckpts/easy_offline_separate_all"
+CHECKPOINT_FOLDER: "data/ckpts/rearrange_2layer_200_6.0E-5"
 NUM_UPDATES: 800
 TEST_INTERVAL: 20
 TOTAL_NUM_STEPS: -1.0
@@ -57,7 +57,7 @@ RL:
   SLACK_REWARD: -0.01
 
   TRAJECTORY_DATASET:
-    trajectory_dir: ["/srv/flash1/xhuang394/share_demos/rearrange_easy", "/srv/flash1/xhuang394/share_demos/nav_place", "/srv/flash1/xhuang394/share_demos/easy_1k"]
+    trajectory_dir: "/srv/flash1/xhuang394/share_demos/rearrange_easy" #, "/srv/flash1/xhuang394/share_demos/nav_place", "/srv/flash1/xhuang394/share_demos/easy_1k"]
     # trajectory_dir: "/srv/share/xhuang394/share_demos/rearrange_easy_separate"
     dataset_size: 10000
     files_per_load: 5
@@ -76,7 +76,7 @@ RL:
     grad_norm_clip: 0.5
     use_linear_lr_decay: True
     batch_size: 230
-    num_workers: 4
+    num_workers: 2
 
     warmup_updates: 200
 
@@ -125,5 +125,5 @@ RL:
 WB:
   PROJECT_NAME: "p-skill-transformer"
   ENTITY: "cvmlp-whoknowsss"
-  RUN_NAME: "easy_offline_separate_all"
+  RUN_NAME: "rearrange_2layer_200_6.0E-5"
   GROUP: "trfm_easy_eval"

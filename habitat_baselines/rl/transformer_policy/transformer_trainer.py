@@ -1051,7 +1051,7 @@ class TransformerTrainer(BaseRLTrainer):
 
                     num_episodes = len(stats_episodes)
                     aggregated_stats = {}
-                    for stat_key in next(iter(stats_episodes.values())).keys():
+                    for stat_key in ["composite_stage_goals.stage_0_5_success", "composite_stage_goals.stage_1_success"]:
                         aggregated_stats[stat_key] = (
                             sum(v[stat_key] for v in stats_episodes.values())
                             / num_episodes
@@ -1117,12 +1117,6 @@ class TransformerTrainer(BaseRLTrainer):
                     #         self.config.TASK_CONFIG.TASK,
                     #         current_episodes_info[i].episode_id,
                     #     )
-
-                    aggregated_stats = {}
-                    for stat_key in next(iter(stats_episodes.values())).keys():
-                        aggregated_stats[stat_key] = np.mean(
-                            [v[stat_key] for v in stats_episodes.values()]
-                        )
 
                 # episode continues
                 # elif len(self.config.VIDEO_OPTION) > 0:
