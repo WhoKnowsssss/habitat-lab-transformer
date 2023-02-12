@@ -58,6 +58,92 @@ class GlobalPredicatesSensor(Sensor):
         truth_values = [p.is_true(sim_info) for p in self.predicates_list]
         return np.array(truth_values, dtype=np.float32)
 
+@registry.register_sensor
+class ReceptacleStateSensor(Sensor):
+    cls_uuid: str = "receptacle_state"
+
+    def __init__(self, sim, config, *args, task, **kwargs):
+        self._task = task
+        self._sim = sim
+        self._predicates_list = None
+        super().__init__(config=config)
+
+    def _get_uuid(self, *args, **kwargs):
+        return ReceptacleStateSensor.cls_uuid 
+
+    def _get_sensor_type(self, *args, **kwargs):
+        return SensorTypes.TENSOR
+
+    @property
+    def predicates_list(self):
+        if self._predicates_list is None:
+            self._predicates_list = (
+                self._task.pddl_problem.get_possible_predicates()
+            )
+        return self._predicates_list
+
+    def _get_observation_space(self, *args, config, **kwargs):
+        return spaces.Box(
+            shape=(5,),
+            low=0,
+            high=1,
+            dtype=np.float32,
+        )
+
+    def get_observation(self, observations, episode, *args, **kwargs):
+        sim_info = self._task.pddl_problem.sim_info
+        truth_values = [p.is_true(sim_info) for p in self.predicates_list]
+        truth_values = np.array(truth_values, dtype=np.float32)
+        mask_in = truth_values[0:5].astype(bool)
+        mask_open = truth_values[[12,13,14,15,20]].astype(bool)
+        return (mask_in & mask_open).astype(float)
+
+@registry.register_measure
+class ReceptaclePerturbation(Measure):
+    cls_uuid: str = "receptacle_perturbation"
+
+    @staticmethod
+    def _get_uuid(*args, **kwargs):
+        return ReceptaclePerturbation.cls_uuid
+
+    def __init__(self, config, task, *args, **kwargs):
+        super().__init__(**kwargs)
+        self._task = task
+        self._predicates_list = None
+        self._config = config
+        self.count_time = 0
+        
+    def reset_metric(self, *args, task, **kwargs):
+        self.count_time = 0
+        self._metric = False
+        self.update_metric(*args, task=task, **kwargs)
+
+    def update_metric(self, *args, task, **kwargs):
+        sim_info = self._task.pddl_problem.sim_info
+        truth_values = [p.is_true(sim_info) for p in self.predicates_list]
+        truth_values = np.array(truth_values, dtype=np.float32)
+        mask_in = truth_values[0:5].astype(bool)
+        mask_open = truth_values[[12,13,14,15,20]].astype(bool)
+        mask = (mask_in & mask_open).astype(float)
+        if np.any(mask) and self.count_time != -1:
+            self.count_time += 1
+        if self.count_time > 50:
+            self.count_time = -1
+            for idx in mask.nonzero()[0]:
+                if idx == 4:
+                    idx = 5
+                self.predicates_list[16+idx].set_state(sim_info)
+            self._metric = True
+        
+
+    @property
+    def predicates_list(self):
+        if self._predicates_list is None:
+            self._predicates_list = (
+                self._task.pddl_problem.get_possible_predicates()
+            )
+        return self._predicates_list
+
 
 @registry.register_measure
 class MoveObjectsReward(RearrangeReward):

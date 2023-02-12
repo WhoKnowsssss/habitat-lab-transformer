@@ -3,8 +3,8 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_test.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-# VIDEO_OPTION: ["disk"]
-VIDEO_OPTION: []
+VIDEO_OPTION: ["disk"]
+# VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/full_ref_3"
 VIDEO_FPS: 30
@@ -15,7 +15,7 @@ VIDEO_RENDER_VIEWS:
 SENSORS: ["HEAD_DEPTH_SENSOR"]
 TEST_EPISODE_COUNT: -1
 EVAL_CKPT_PATH_DIR: ""
-NUM_ENVIRONMENTS: 8
+NUM_ENVIRONMENTS: 1
 WRITER_TYPE: 'tb'
 CHECKPOINT_FOLDER: "data/new_checkpoints"
 NUM_UPDATES: -1
@@ -42,6 +42,7 @@ TASK_CONFIG:
       - OBJECT_SENSOR
       - ABS_TARGET_START_SENSOR
       - TARGET_START_OFFSET_SENSOR
+      - RECEPTACLE_STATE_SENSOR
   GYM:
     OBS_KEYS:
       - robot_head_depth
@@ -57,6 +58,7 @@ TASK_CONFIG:
       - obj_goal_pos_sensor
       - abs_obj_start_sensor
       - obj_start_offset_sensor
+      - receptacle_state
 
 DATASET_SAVE_PATH: "/srv/share/aszot3/share_demos/nav_pick_03_09/"
 DATASET_SAVE_INTERVAL: 2

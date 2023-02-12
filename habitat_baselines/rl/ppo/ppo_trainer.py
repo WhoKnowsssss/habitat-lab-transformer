@@ -1132,7 +1132,6 @@ class PPOTrainer(BaseRLTrainer):
             # NB: Move actions to CPU.  If CUDA tensors are
             # sent in to env.step(), that will create CUDA contexts
             # in the subprocesses.
-            
             if is_continuous_action_space(self.policy_action_space):
                 # Clipping actions to the specified limits
                 step_data = [
@@ -1155,13 +1154,13 @@ class PPOTrainer(BaseRLTrainer):
                 infos[i].update(policy_info[i])
 
             # #HACK
-            # for i in range(len(policy_info)):
-            #     infos[i].update(
-            #         {
-            #         "obj_curr_pos": "{},{},{}".format(batch['obj_goal_pos_sensor'][i,0], batch['obj_goal_pos_sensor'][i,1], batch['obj_goal_pos_sensor'][i,2]),
-            #         "abs_obj_pos": "{},{},{}".format(batch['abs_obj_start_sensor'][i,0], batch['abs_obj_start_sensor'][i,1], batch['abs_obj_start_sensor'][i,2]),
-            #         }
-            #     )
+            for i in range(len(policy_info)):
+                infos[i].update(
+                    {
+                    "all_predicates": "{},{},{},{},{}".format(batch['all_predicates'][i,0], batch['all_predicates'][i,1], batch['all_predicates'][i,2], batch['all_predicates'][i,3], batch['all_predicates'][i,4]),
+                    "receptacle_state": "{},{},{},{},{}".format(batch['receptacle_state'][i,0], batch['receptacle_state'][i,1], batch['receptacle_state'][i,2], batch['receptacle_state'][i,3], batch['receptacle_state'][i,4]),
+                    }
+                )
             batch = batch_obs(  # type: ignore
                 observations,
                 device=self.device,

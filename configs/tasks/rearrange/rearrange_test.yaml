@@ -14,7 +14,7 @@ ENVIRONMENT:
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_1k_2.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_1k.json.gz
     # DATA_PATH: data/datasets/replica_cad/rearrange/v1/val/rearrange.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
@@ -59,6 +59,10 @@ TASK:
         TYPE: "TargetStartOffsetSensor"
         GOAL_FORMAT: "CARTESIAN"
         DIMENSIONALITY: 3
+    RECEPTACLE_STATE_SENSOR:
+        TYPE: "ReceptacleStateSensor"
+    RECEPTACLE_PERTURBATION:
+        TYPE: "ReceptaclePerturbation"
     SENSORS:
     - RELATIVE_RESTING_POS_SENSOR
     - TARGET_START_SENSOR
@@ -90,6 +94,7 @@ TASK:
     - DID_VIOLATE_HOLD_CONSTRAINT
     - MOVE_OBJECTS_REWARD
     - COMPOSITE_STAGE_GOALS
+    - RECEPTACLE_PERTURBATION
     ACTIONS:
         ARM_ACTION:
             GRIP_CONTROLLER: SuctionGraspAction

@@ -115,7 +115,9 @@ class HierarchicalPolicy(Policy):
         policy_infos = []
         for i, info in enumerate(infos):
             cur_skill_idx = self._cur_skills[i].item()
-            policy_info = {"cur_skill": self._idx_to_name[cur_skill_idx]}
+            policy_info = {
+                "cur_skill": self._idx_to_name[cur_skill_idx],
+            }
 
             did_skill_fail = dones[i] and not info[CompositeSuccess.cls_uuid]
             for skill_name, idx in self._name_to_idx.items():

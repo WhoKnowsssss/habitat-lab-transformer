@@ -14,7 +14,7 @@ ENVIRONMENT:
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_open_200_2.json.gz #
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_1k.json.gz #rearrange_obj_closed_open_200_2
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangeCompositeTask-v0

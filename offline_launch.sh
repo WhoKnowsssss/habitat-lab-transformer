@@ -4,7 +4,8 @@ set -x
 source ~/.bashrc
 
 conda activate /srv/cvmlp-lab/flash1/xhuang394/conda/hab_new
-MAGNUM_LOG=quiet HABITAT_SIM_LOG=quiet
+export MAGNUM_LOG=quiet 
+export HABITAT_SIM_LOG=quiet
 export TMPDIR=~/tmp/
 if [ $1 == "dt" ];
 	then
