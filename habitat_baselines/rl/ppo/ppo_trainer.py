@@ -1107,6 +1107,8 @@ class PPOTrainer(BaseRLTrainer):
                 buffer_obs[i].append(visual_batch[i])
 
         success_counter_temp = []
+        skill_data = np.ones((self.envs.num_envs, 5000, 2)) * -1
+        skill_accuracy = []
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
             and self.envs.num_envs > 0
@@ -1150,6 +1152,12 @@ class PPOTrainer(BaseRLTrainer):
                 list(x) for x in zip(*outputs)
             ]
             policy_info = self.actor_critic.get_policy_info(infos, dones)
+            oracle_skill = self.get_oracle_skill(batch)
+            timestep_mask = np.argmax(np.all(skill_data == -1, -1), -1)
+            for i in range(len(policy_info)):
+                infos[i].update(policy_info[i])
+                skill_data[i,timestep_mask[i],0] = self.skill_dict[policy_info[i]["cur_skill"]]
+                skill_data[i,timestep_mask[i],1] = oracle_skill[i]
             for i in range(len(policy_info)):
                 infos[i].update(policy_info[i])
 
@@ -1284,6 +1292,12 @@ class PPOTrainer(BaseRLTrainer):
                     ep_eval_count[k] += 1
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[(k, ep_eval_count[k])] = episode_stats
+                    mask = skill_data[i,:,0] != -1
+                    # torch.save(skill_data[i,mask,:], '/coc/testnvme/xhuang394/planner_analysis_2.pth')
+                    # print("SAVED")
+                    skill_accuracy.append(self.get_skill_accuracy(skill_data[i,mask,:]))
+                    print("Skill Accuracy: ", torch.mean(torch.tensor(skill_accuracy)))
+                    skill_data[i, :, :] = -1
 
                     if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
@@ -1391,3 +1405,47 @@ class PPOTrainer(BaseRLTrainer):
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
 
         self.envs.close()
+
+    def get_oracle_skill(self, observations):
+        mask_hold = observations['all_predicates'][:,10].bool()
+        mask_goal = (observations["obj_goal_gps_compass"][:,0] < 1.5)
+        mask_start = (observations["obj_start_gps_compass"][:,0] < 1.5)
+        mask_in = torch.any(observations['all_predicates'][:,:5], dim=-1)
+        mask_pick = torch.any(observations['receptacle_state'][:,:5], dim=-1)
+        # =========== rules ===========
+        skills = torch.zeros(len(mask_hold))
+        skills[mask_hold & mask_goal] = 2
+        skills[mask_hold & ~mask_goal] = 4
+        skills[~mask_hold & ~mask_start] = 0
+        skills[~mask_hold & mask_start & ~mask_in] = 1
+        skills[~mask_hold & mask_start & mask_in & mask_pick] = 1
+        skills[~mask_hold & mask_start & mask_in & ~mask_pick] = 5
+
+        return skills
+
+    @property
+    def skill_dict(self):
+        return {
+            "nav": 0,
+            "nav_goal": 4,
+            "pick": 1,
+            "pick_offset": 3,
+            "place": 2,
+            "open_cab": 5,
+            "open_fridge": 6,
+            "reset_arm": -1,
+            "wait": 7,
+        }
+    
+    def get_skill_accuracy(self, planner):
+        skill_dict = {v: k for k,v in self.skill_dict.items()}
+
+        accuracy = []
+        for i in range(len(planner)):
+            if planner[i,0] == 6:
+                planner[i,0] = 5
+            if planner[i,0] == 3:
+                planner[i,0] = 1
+            accuracy.append(float(skill_dict[planner[i,0]] == skill_dict[planner[i,1]]))
+
+        return torch.mean(torch.tensor(accuracy))

@@ -3,8 +3,8 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_test.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-VIDEO_OPTION: ["disk"]
-# VIDEO_OPTION: []
+# VIDEO_OPTION: ["disk"]
+VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/full_ref_3"
 VIDEO_FPS: 30
@@ -85,7 +85,7 @@ RL:
           AT_RESTING_THRESHOLD: 0.15
           OBS_SKILL_INPUTS: []
           LOAD_CKPT_FILE: "data/models/opencab.pth"
-          MAX_SKILL_STEPS: 200
+          MAX_SKILL_STEPS: 500
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: False
 
@@ -96,7 +96,7 @@ RL:
           AT_RESTING_THRESHOLD: 0.15
           OBS_SKILL_INPUTS: []
           LOAD_CKPT_FILE: "data/models/openfridge.pth"
-          MAX_SKILL_STEPS: 200
+          MAX_SKILL_STEPS: 500
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: False
 
@@ -107,7 +107,7 @@ RL:
           AT_RESTING_THRESHOLD: 0.2
           OBS_SKILL_INPUTS: ["obj_start_sensor"]
           LOAD_CKPT_FILE: "data/models/close_cab.pth"
-          MAX_SKILL_STEPS: 200
+          MAX_SKILL_STEPS: 500
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: False
 
@@ -118,7 +118,7 @@ RL:
           AT_RESTING_THRESHOLD: 0.2
           OBS_SKILL_INPUTS: ["obj_start_sensor"]
           LOAD_CKPT_FILE: "data/models/close_fridge.pth"
-          MAX_SKILL_STEPS: 200
+          MAX_SKILL_STEPS: 500
           START_ZONE_RADIUS: 0.3
           FORCE_END_ON_TIMEOUT: False
 
@@ -129,8 +129,8 @@ RL:
           AT_RESTING_THRESHOLD: 0.2
           OBS_SKILL_INPUTS: ["obj_start_sensor"]
           LOAD_CKPT_FILE: "data/models/pick.pth"
-          MAX_SKILL_STEPS: 200
-          FORCE_END_ON_TIMEOUT: True
+          MAX_SKILL_STEPS: 500
+          FORCE_END_ON_TIMEOUT: False
 
         NN_PLACE:
           skill_name: "PlaceSkillPolicy"
@@ -139,8 +139,8 @@ RL:
           AT_RESTING_THRESHOLD: 0.15
           OBS_SKILL_INPUTS: ["obj_goal_sensor"]
           LOAD_CKPT_FILE: "data/models/place.pth"
-          MAX_SKILL_STEPS: 200
-          FORCE_END_ON_TIMEOUT: True
+          MAX_SKILL_STEPS: 500
+          FORCE_END_ON_TIMEOUT: False
 
         NN_NAV:
           skill_name: "NavSkillPolicy"
@@ -172,8 +172,8 @@ RL:
           AT_RESTING_THRESHOLD: 0.2
           OBS_SKILL_INPUTS: ["obj_start_sensor"]
           LOAD_CKPT_FILE: "data/models/pick.pth"
-          MAX_SKILL_STEPS: 200
-          FORCE_END_ON_TIMEOUT: True
+          MAX_SKILL_STEPS: 500
+          FORCE_END_ON_TIMEOUT: False
 
       USE_SKILLS:
         # Uncomment if you are also using these skills
