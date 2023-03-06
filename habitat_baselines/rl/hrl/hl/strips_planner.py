@@ -74,7 +74,7 @@ class StripsHighLevelPolicy(HighLevelPolicy):
                 final_sol_actions.append(parse_func("reset_arm(0)"))
 
         # Add a wait action at the end.
-        final_sol_actions.append(parse_func("wait(5000)"))
+        final_sol_actions.append(parse_func("wait(30)"))
         return final_sol_actions
 
     def get_next_skill(

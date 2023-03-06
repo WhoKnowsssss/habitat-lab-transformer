@@ -9,13 +9,18 @@ GYM:
     - obj_goal_gps_compass
     - joint
     - is_holding
+    - all_predicates
+    - obj_goal_pos_sensor
+    - abs_obj_start_sensor
+    - obj_start_offset_sensor
+    - receptacle_state
 ENVIRONMENT:
     MAX_EPISODE_STEPS: 5000
 DATASET:
     TYPE: RearrangeDataset-v0
     SPLIT: train
-    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_1k_2.json.gz
-    # DATA_PATH: data/datasets/replica_cad/rearrange/v1/val/rearrange_easy.json.gz
+    DATA_PATH: data/datasets/replica_cad/rearrange/v1/train/rearrange_obj_closed_open_200_2.json.gz
+    # DATA_PATH: data/datasets/replica_cad/rearrange/v1/val/rearrange_obj_closed_open_400.json.gz
     SCENES_DIR: data/replica_cad/
 TASK:
     TYPE: RearrangeCompositeTask-v0
@@ -72,8 +77,11 @@ TASK:
     - END_EFFECTOR_SENSOR
     - TARGET_START_GPS_COMPASS_SENSOR
     - TARGET_GOAL_GPS_COMPASS_SENSOR
+    - GLOBAL_PREDICATE_SENSOR 
     - OBJECT_SENSOR
     - ABS_TARGET_START_SENSOR
+    - TARGET_START_OFFSET_SENSOR
+    - RECEPTACLE_STATE_SENSOR
     FORCE_TERMINATE:
         TYPE: ForceTerminate
         # MAX_ACCUM_FORCE: 100_000.0
@@ -94,7 +102,7 @@ TASK:
     - DID_VIOLATE_HOLD_CONSTRAINT
     - MOVE_OBJECTS_REWARD
     - COMPOSITE_STAGE_GOALS
-    - RECEPTACLE_PERTURBATION
+    # - RECEPTACLE_PERTURBATION
     ACTIONS:
         ARM_ACTION:
             GRIP_CONTROLLER: SuctionGraspAction

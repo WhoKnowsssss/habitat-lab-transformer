@@ -110,7 +110,7 @@ class TransformerResNetPolicy(NetPolicy):
             self.focal_loss_pick = FocalLoss(
                 alpha=(1 - torch.tensor([0.8, 0.1, 0.1])), gamma=5
             ).cuda()
-            # self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
+            self.aux_head = nn.Linear(512, 5).cuda() #DTHACK
 
         self.action_config = policy_config.ACTION_DIST
 
@@ -171,8 +171,8 @@ class TransformerResNetPolicy(NetPolicy):
             backbone=config.RL.TRANSFORMER.backbone,
             force_blind_policy=config.FORCE_BLIND_POLICY,
             policy_config=config.RL.POLICY,
-            fuse_keys=config.TASK_CONFIG.GYM.OBS_KEYS,
-            # fuse_keys=config.RL.GYM_OBS_KEYS
+            # fuse_keys=config.TASK_CONFIG.GYM.OBS_KEYS,
+            fuse_keys=['robot_head_depth','relative_resting_position','obj_start_sensor','obj_goal_sensor','obj_start_gps_compass','obj_goal_gps_compass','joint','is_holding']
         )
 
     def act(
@@ -425,7 +425,7 @@ class TransformerResNetPolicy(NetPolicy):
             # DTHACK
             # B = actions.shape[0]
             # temp_target = states["skill"].reshape(B, -1, 1)
-            # loss_p = F.cross_entropy(
+            # loss_p = self.focal_loss_pick(
             #     self.aux_head(features).permute(0, 2, 1),
             #     temp_target.reshape(B, -1).long(),
             #     label_smoothing=0.05,
@@ -488,6 +488,7 @@ class TransformerResNetPolicy(NetPolicy):
         for i, info in enumerate(infos):
             policy_info = {
                 "cur_skill": self.net.cur_skill[i],
+                # "cur_skill": self.cur_skill[i],
                 "reset_arm": self.reset_mask[i],
                 "gripper": self.gripper_action[i],
                 "predicted_dist": "{}, {}; {}, {}".format(self.net.predicted_dist[i,0], self.net.predicted_dist[i,1], self.net.predicted_dist[i,2], self.net.predicted_dist[i,3]),

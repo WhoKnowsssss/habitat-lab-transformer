@@ -93,6 +93,10 @@ class HierarchicalPolicy(Policy):
             (self._num_envs,), -1, dtype=torch.long
         )
 
+        self._is_nav_goal: torch.Tensor = torch.full(
+            (self._num_envs,), -1, dtype=torch.long
+        )
+
         high_level_cls = eval(config.high_level_policy.name)
         self._high_level_policy: HighLevelPolicy = high_level_cls(
             config.high_level_policy,
@@ -118,6 +122,8 @@ class HierarchicalPolicy(Policy):
             policy_info = {
                 "cur_skill": self._idx_to_name[cur_skill_idx],
             }
+            if self._is_nav_goal[0] == 1 and cur_skill_idx == 4:
+                policy_info["cur_skill"] = 'nav_goal'
 
             did_skill_fail = dones[i] and not info[CompositeSuccess.cls_uuid]
             for skill_name, idx in self._name_to_idx.items():
@@ -232,6 +238,10 @@ class HierarchicalPolicy(Policy):
                 masks,
                 self._call_high_level,
             )
+            if new_skills[0] == 4 and 'TARGET_goal0|0' in new_skill_args[0]:
+                self._is_nav_goal[0] = 1
+            else:
+                self._is_nav_goal[0] = 0
 
             sel_grouped_skills = self._broadcast_skill_ids(
                 new_skills,

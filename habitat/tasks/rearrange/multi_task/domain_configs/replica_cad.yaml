@@ -63,7 +63,7 @@ predicates:
     set_state:
       art_states:
         cab_id:
-          value: 0.45
+          value: 0.35
           cmp: 'greater'
           override_thresh: 0.1
 
@@ -87,7 +87,7 @@ predicates:
     set_state:
       art_states:
         fridge_id:
-          value: 1.22
+          value: 0.7
           cmp: 'greater'
 
   - name: closed_fridge

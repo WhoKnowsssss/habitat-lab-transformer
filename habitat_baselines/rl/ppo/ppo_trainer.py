@@ -1158,8 +1158,6 @@ class PPOTrainer(BaseRLTrainer):
                 infos[i].update(policy_info[i])
                 skill_data[i,timestep_mask[i],0] = self.skill_dict[policy_info[i]["cur_skill"]]
                 skill_data[i,timestep_mask[i],1] = oracle_skill[i]
-            for i in range(len(policy_info)):
-                infos[i].update(policy_info[i])
 
             # #HACK
             for i in range(len(policy_info)):
@@ -1322,10 +1320,9 @@ class PPOTrainer(BaseRLTrainer):
                             / num_episodes
                         )
 
-                    print(
-                        "\n\nSuccess Rate: ",
-                        aggregated_stats["composite_success"],
-                    )
+                    for k in aggregated_stats.keys():
+                        if 'success' in k:
+                            print(k, ': ', aggregated_stats[k])
                     print(
                         "Rearrange success: ",
                         sum(success_counter_temp) / len(success_counter_temp)
@@ -1446,6 +1443,6 @@ class PPOTrainer(BaseRLTrainer):
                 planner[i,0] = 5
             if planner[i,0] == 3:
                 planner[i,0] = 1
-            accuracy.append(float(skill_dict[planner[i,0]] == skill_dict[planner[i,1]]))
+            accuracy.append(float(planner[i,0] == planner[i,1]))
 
         return torch.mean(torch.tensor(accuracy))

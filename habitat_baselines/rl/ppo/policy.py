@@ -150,6 +150,7 @@ class NetPolicy(nn.Module, Policy):
             )
         distribution = self.action_distribution(features)
         value = self.critic(features)
+        # self.cur_skill = torch.argmax(self.aux_head(features), dim=-1)
 
         if deterministic:
             if self.action_distribution_type == "categorical":
