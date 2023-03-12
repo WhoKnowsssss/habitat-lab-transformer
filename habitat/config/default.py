@@ -762,6 +762,8 @@ _C.SIMULATOR.ARM_DEPTH_SENSOR.UUID = "robot_arm_depth"
 # -----------------------------------------------------------------------------
 _C.SIMULATOR.THIRD_RGB_SENSOR = _C.SIMULATOR.RGB_SENSOR.clone()
 _C.SIMULATOR.THIRD_RGB_SENSOR.UUID = "robot_third_rgb"
+_C.SIMULATOR.THIRD_RGB_SENSOR.WIDTH = 2048
+_C.SIMULATOR.THIRD_RGB_SENSOR.HEIGHT = 2048
 # -----------------------------------------------------------------------------
 # 3rd DEPTH SENSOR
 # -----------------------------------------------------------------------------

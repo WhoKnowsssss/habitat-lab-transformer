@@ -1225,8 +1225,8 @@ class PPOTrainer(BaseRLTrainer):
                         frame = observations_to_image(
                             {k: v[i] * 0.0 for k, v in batch.items()}, infos[i]
                         )
-                    if self.config.VIDEO_RENDER_ALL_INFO:
-                        frame = overlay_frame(frame, infos[i])
+                    # if self.config.VIDEO_RENDER_ALL_INFO:
+                    #     frame = overlay_frame(frame, infos[i])
                     rgb_frames[i].append(frame)
 
                 # episode ended
