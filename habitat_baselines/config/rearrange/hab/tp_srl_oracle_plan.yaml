@@ -3,8 +3,8 @@ BASE_TASK_CONFIG_PATH: configs/tasks/rearrange/rearrange_test.yaml
 TRAINER_NAME: "ddppo"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-VIDEO_OPTION: ["disk"]
-# VIDEO_OPTION: []
+# VIDEO_OPTION: ["disk"]
+VIDEO_OPTION: []
 TENSORBOARD_DIR: "tb"
 VIDEO_DIR: "video_dir/full_ref_4"
 VIDEO_FPS: 30

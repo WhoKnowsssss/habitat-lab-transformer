@@ -1064,7 +1064,7 @@ class PPOTrainer(BaseRLTrainer):
         pbar = tqdm.tqdm(total=number_of_eval_episodes * evals_per_ep)
         self.actor_critic.eval()
 
-        if self.config.DATASET_SAVE_PATH is not None:
+        if False: #self.config.DATASET_SAVE_PATH is not None:
             os.makedirs(self.config.DATASET_SAVE_PATH, exist_ok=True)
 
             def flush_episodes():
@@ -1186,11 +1186,11 @@ class PPOTrainer(BaseRLTrainer):
             next_episodes_info = self.envs.current_episodes()
             envs_to_pause = []
             n_envs = self.envs.num_envs
-            if self.config.DATASET_SAVE_PATH is not None:
+            if False: #self.config.DATASET_SAVE_PATH is not None:
                 visual_batch = get_save_obs(batch)
 
             for i in range(n_envs):
-                if self.config.DATASET_SAVE_PATH is not None:
+                if False: #self.config.DATASET_SAVE_PATH is not None:
                     # Add the step to the buffer
                     buffer_obs[i].append(visual_batch[i])
                     buffer_rewards[i].append(rewards[i])
@@ -1232,7 +1232,7 @@ class PPOTrainer(BaseRLTrainer):
                 # episode ended
                 if not not_done_masks[i].item():
                     # Flush buffer to the final dataset
-                    if self.config.DATASET_SAVE_PATH is not None:
+                    if False: #self.config.DATASET_SAVE_PATH is not None:
                         all_obs.extend(
                             [
                                 {k: v for k, v in obs.items()}

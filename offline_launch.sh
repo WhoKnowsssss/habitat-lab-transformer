@@ -23,4 +23,4 @@ else
 	wandb online
 fi
 
-srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/$CONFIG --run-type $MODE TASK_CONFIG.SEED ${3:-42} TASK_CONFIG.SIMULATOR.SEED ${3:-42}
+srun -u python -u habitat_baselines/run.py --exp-config habitat_baselines/config/rearrange/hab/$CONFIG --run-type $MODE TASK_CONFIG.SEED ${3:-10087} TASK_CONFIG.SIMULATOR.SEED ${3:-10087}
